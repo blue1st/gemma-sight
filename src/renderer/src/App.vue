@@ -25,6 +25,9 @@ const modelId = ref('onnx-community/gemma-4-E2B-it-ONNX')
 const DEFAULT_PROMPT = 'Describe this image in Japanese.'
 const promptText = ref(DEFAULT_PROMPT)
 
+// Sampling Interval (ms)
+const samplingInterval = ref(2000)
+
 function resetPrompt(): void {
   promptText.value = DEFAULT_PROMPT
 }
@@ -160,7 +163,7 @@ function initWorker(): void {
         if (isStreaming.value) {
           setTimeout(() => {
             if (isStreaming.value) captureAndAnalyze()
-          }, 500)
+          }, samplingInterval.value)
         }
         break
       case 'error':
@@ -395,7 +398,7 @@ onUnmounted(() => {
             />
           </div>
 
-          <button :disabled="isLoading" @click="loadModel">Load Model</button>
+          <button class="load-btn" :disabled="isLoading" @click="loadModel">Load Model</button>
         </div>
 
         <div class="control-row">
@@ -408,19 +411,36 @@ onUnmounted(() => {
             ></textarea>
             <button class="reset-btn" title="Restore default prompt" @click="resetPrompt">⎌</button>
           </div>
+          <button
+            class="action-btn capture-btn"
+            :disabled="!isModelLoaded || isLoading"
+            :style="isModelLoaded ? { background: '#3867d6' } : {}"
+            @click="captureAndAnalyze"
+          >
+            Capture & Analyze
+          </button>
+        </div>
 
-          <div class="action-buttons">
-            <button :disabled="!isModelLoaded || isLoading" @click="captureAndAnalyze">
-              Capture & Analyze
-            </button>
-            <button
-              :disabled="!isModelLoaded"
-              :style="isModelLoaded ? { background: isStreaming ? '#ff4757' : '#2ed573' } : {}"
-              @click="toggleStreaming"
-            >
-              {{ isStreaming ? 'Stop Live' : 'Start Live Analysis' }}
-            </button>
+        <div class="control-row">
+          <div class="control-group">
+            <label>Live Interval (ms)</label>
+            <input
+              v-model.number="samplingInterval"
+              type="number"
+              step="500"
+              min="0"
+              style="width: 100px"
+            />
           </div>
+
+          <button
+            class="action-btn live-btn"
+            :disabled="!isModelLoaded"
+            :style="isModelLoaded ? { background: isStreaming ? '#ff4757' : '#2ed573' } : {}"
+            @click="toggleStreaming"
+          >
+            {{ isStreaming ? 'Stop Live' : 'Start Live Analysis' }}
+          </button>
         </div>
       </div>
       <div class="status">
@@ -453,7 +473,6 @@ onUnmounted(() => {
 
       <div class="sidebar">
         <div class="sidebar-header">
-          <h3>Analysis Result</h3>
           <div class="sidebar-actions">
             <button class="clear-btn" :disabled="!resultText || isLoading" @click="clearResult">
               Clear
@@ -617,6 +636,47 @@ body {
 .controls-container button:disabled {
   background: #aaa;
   cursor: not-allowed;
+  box-shadow: none !important;
+  transform: none !important;
+}
+.action-btn {
+  margin-left: auto;
+  height: 48px; /* Increased height */
+  padding: 0 24px !important;
+  min-width: 240px; /* Standardize width */
+  font-weight: 700 !important;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  box-shadow: 0 4px 0 rgba(0, 0, 0, 0.15);
+  transition: all 0.1s ease;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-bottom: 4px solid rgba(0, 0, 0, 0.2) !important;
+}
+.action-btn:active:not(:disabled) {
+  transform: translateY(2px);
+  box-shadow: 0 2px 0 rgba(0, 0, 0, 0.15);
+  border-bottom-width: 2px !important;
+}
+.load-btn {
+  margin-left: auto;
+  background: #00a8ff !important; /* Brighter blue */
+  color: white;
+  border: none;
+  cursor: pointer;
+}
+.load-btn:hover:not(:disabled) {
+  background: #0097e6 !important;
+}
+.capture-btn {
+  /* Dynamic styling in template */
+}
+.capture-btn:hover:not(:disabled) {
+  background: #2d5a9e !important;
+}
+.live-btn {
+/* Dynamic styling in template */
 }
 .status {
   margin-top: 10px;
