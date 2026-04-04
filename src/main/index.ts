@@ -18,6 +18,7 @@ function createWindow(): void {
     height: 670,
     show: false,
     autoHideMenuBar: true,
+    title: `${app.getName()} v${app.getVersion()}`,
     ...(process.platform === 'linux' ? { icon } : {}),
     webPreferences: {
       preload: join(__dirname, '../preload/index.js'),
@@ -27,6 +28,11 @@ function createWindow(): void {
 
   mainWindow.on('ready-to-show', () => {
     mainWindow.show()
+  })
+
+  // Prevent HTML <title> from overriding our custom title with version
+  mainWindow.on('page-title-updated', (event) => {
+    event.preventDefault()
   })
 
   mainWindow.webContents.setWindowOpenHandler((details) => {

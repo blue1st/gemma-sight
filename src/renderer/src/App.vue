@@ -577,122 +577,149 @@ onUnmounted(() => {
   <div class="app-container">
     <header class="header">
       <div class="controls-container">
+        <!-- Row 1: Source Type + Source -->
         <div class="control-row">
-          <div class="control-group">
-            <label>Source Type</label>
-            <select v-model="sourceType" @change="onSourceTypeChange">
-              <option value="screen">Screen / Window</option>
-              <option value="webcam">WebCam</option>
-              <option value="video">Video File</option>
-            </select>
-          </div>
-
-          <div v-if="sourceType !== 'video'" class="control-group">
-            <label>Source</label>
-            <select v-model="selectedSourceId" @change="startStream">
-              <template v-if="sourceType === 'screen'">
-                <option v-for="s in screenSources" :key="s.id" :value="s.id">
-                  {{ s.name }}
-                </option>
-              </template>
-              <template v-else-if="sourceType === 'webcam'">
-                <option v-for="w in webcamSources" :key="w.deviceId" :value="w.deviceId">
-                  {{ w.label || `Camera ${w.deviceId}` }}
-                </option>
-              </template>
-            </select>
-            <button class="refresh-btn" @click="fetchSources">🔄</button>
-          </div>
-
-          <div v-if="sourceType === 'video'" class="control-group">
-            <label>Video File</label>
-            <button class="load-btn" @click="selectVideoFile">
-              {{ videoFilePath ? 'Change File' : 'Select File' }}
-            </button>
-            <span v-if="videoFilePath" class="video-file-name" :title="videoFilePath">
-              {{ videoFilePath.split('/').pop() }}
-            </span>
-          </div>
-
-          <div class="control-group">
-            <label>Audio Source</label>
-            <select v-model="selectedAudioSourceId">
-              <option v-for="a in audioSources" :key="a.deviceId" :value="a.deviceId">
-                {{ a.label || `Audio ${a.deviceId}` }}
-              </option>
-            </select>
-            <div v-if="includeAudio" class="volume-meter" title="Current Audio Level">
-              <div
-                class="volume-level"
-                :style="{
-                  width: audioVolume + '%',
-                  background: audioVolume > 70 ? '#ff4757' : '#2ed573'
-                }"
-              ></div>
+          <div class="control-row-left">
+            <div class="control-group">
+              <label>Source Type</label>
+              <select v-model="sourceType" @change="onSourceTypeChange">
+                <option value="screen">Screen / Window</option>
+                <option value="webcam">WebCam</option>
+                <option value="video">Video File</option>
+              </select>
             </div>
-            <div v-if="audioStatus" class="audio-status-label">{{ audioStatus }}</div>
-            <label class="checkbox-label" style="margin-left: 10px">
+          </div>
+          <div class="control-row-right">
+            <div v-if="sourceType !== 'video'" class="control-group">
+              <label>Source</label>
+              <select v-model="selectedSourceId" class="source-select" @change="startStream">
+                <template v-if="sourceType === 'screen'">
+                  <option v-for="s in screenSources" :key="s.id" :value="s.id">
+                    {{ s.name }}
+                  </option>
+                </template>
+                <template v-else-if="sourceType === 'webcam'">
+                  <option v-for="w in webcamSources" :key="w.deviceId" :value="w.deviceId">
+                    {{ w.label || `Camera ${w.deviceId}` }}
+                  </option>
+                </template>
+              </select>
+              <button class="refresh-btn" @click="fetchSources">🔄</button>
+            </div>
+            <div v-if="sourceType === 'video'" class="control-group">
+              <label>Video File</label>
+              <button class="load-btn" @click="selectVideoFile">
+                {{ videoFilePath ? 'Change File' : 'Select File' }}
+              </button>
+              <span v-if="videoFilePath" class="video-file-name" :title="videoFilePath">
+                {{ videoFilePath.split('/').pop() }}
+              </span>
+            </div>
+          </div>
+        </div>
+
+        <!-- Row 2: Audio Source + Use Audio -->
+        <div class="control-row">
+          <div class="control-row-left">
+            <div class="control-group">
+              <label>Audio Source</label>
+              <select v-model="selectedAudioSourceId">
+                <option v-for="a in audioSources" :key="a.deviceId" :value="a.deviceId">
+                  {{ a.label || `Audio ${a.deviceId}` }}
+                </option>
+              </select>
+              <div v-if="includeAudio" class="volume-meter" title="Current Audio Level">
+                <div
+                  class="volume-level"
+                  :style="{
+                    width: audioVolume + '%',
+                    background: audioVolume > 70 ? '#ff4757' : '#2ed573'
+                  }"
+                ></div>
+              </div>
+              <div v-if="audioStatus" class="audio-status-label">{{ audioStatus }}</div>
+            </div>
+          </div>
+          <div class="control-row-right">
+            <label class="checkbox-label">
               <input v-model="includeAudio" type="checkbox" />
               Use Audio
             </label>
           </div>
-
-          <div class="control-group">
-            <label>Model</label>
-            <input
-              v-model="modelId"
-              placeholder="e.g. google/gemma-4-E2B-it"
-              style="width: 200px"
-              readonly
-            />
-          </div>
-
-          <button class="load-btn" :disabled="isLoading" @click="loadModel">Load Model</button>
         </div>
 
+        <!-- Row 3: Model + Load Model -->
         <div class="control-row">
-          <div class="control-group prompt-group">
-            <label>Prompt</label>
-            <textarea
-              v-model="promptText"
-              placeholder="Prompt..."
-              class="prompt-textarea"
-            ></textarea>
-            <button class="reset-btn" title="Restore default prompt" @click="resetPrompt">⎌</button>
+          <div class="control-row-left">
+            <div class="control-group">
+              <label>Model</label>
+              <input
+                v-model="modelId"
+                placeholder="e.g. google/gemma-4-E2B-it"
+                class="model-input"
+                readonly
+              />
+            </div>
           </div>
-          <button
-            class="action-btn capture-btn"
-            :disabled="!isModelLoaded || isLoading"
-            :style="isModelLoaded ? { background: '#3867d6' } : {}"
-            @click="captureAndAnalyze"
-          >
-            Capture & Analyze
-          </button>
+          <div class="control-row-right">
+            <button class="load-btn" :disabled="isLoading" @click="loadModel">Load Model</button>
+          </div>
         </div>
 
+        <!-- Row 4: Prompt + Capture & Analyze -->
         <div class="control-row">
-          <div class="control-group">
-            <label>Live Interval (ms)</label>
-            <input
-              v-model.number="samplingInterval"
-              type="number"
-              step="500"
-              min="0"
-              style="width: 100px"
-            />
-            <button class="reset-btn" title="Restore default interval" @click="resetInterval">
-              ⎌
+          <div class="control-row-left">
+            <div class="control-group prompt-group">
+              <label>Prompt</label>
+              <textarea
+                v-model="promptText"
+                placeholder="Prompt..."
+                class="prompt-textarea"
+              ></textarea>
+              <button class="reset-btn" title="Restore default prompt" @click="resetPrompt">
+                ⎌
+              </button>
+            </div>
+          </div>
+          <div class="control-row-right">
+            <button
+              class="action-btn capture-btn"
+              :disabled="!isModelLoaded || isLoading"
+              :style="isModelLoaded ? { background: '#3867d6' } : {}"
+              @click="captureAndAnalyze"
+            >
+              Capture & Analyze
             </button>
           </div>
+        </div>
 
-          <button
-            class="action-btn live-btn"
-            :disabled="!isModelLoaded"
-            :style="isModelLoaded ? { background: isStreaming ? '#ff4757' : '#2ed573' } : {}"
-            @click="toggleStreaming"
-          >
-            {{ isStreaming ? 'Stop Live' : 'Start Live Analysis' }}
-          </button>
+        <!-- Row 5: Live Interval + Start Live Analysis -->
+        <div class="control-row">
+          <div class="control-row-left">
+            <div class="control-group">
+              <label>Live Interval (ms)</label>
+              <input
+                v-model.number="samplingInterval"
+                type="number"
+                step="500"
+                min="0"
+                style="width: 100px"
+              />
+              <button class="reset-btn" title="Restore default interval" @click="resetInterval">
+                ⎌
+              </button>
+            </div>
+          </div>
+          <div class="control-row-right">
+            <button
+              class="action-btn live-btn"
+              :disabled="!isModelLoaded"
+              :style="isModelLoaded ? { background: isStreaming ? '#ff4757' : '#2ed573' } : {}"
+              @click="toggleStreaming"
+            >
+              {{ isStreaming ? 'Stop Live' : 'Start Live Analysis' }}
+            </button>
+          </div>
         </div>
       </div>
       <div class="status">
@@ -799,21 +826,6 @@ body {
   flex-direction: column;
   gap: 12px;
 }
-.control-row {
-  display: flex;
-  gap: 15px;
-  align-items: center;
-  flex-wrap: wrap;
-}
-.control-row:last-child {
-  align-items: flex-start;
-}
-.action-buttons {
-  display: flex;
-  gap: 10px;
-  align-self: flex-start;
-  padding-top: 0;
-}
 .controls-container select,
 .controls-container input,
 .controls-container button,
@@ -823,16 +835,40 @@ body {
   border-radius: 6px;
   font-size: 14px;
 }
+.control-row {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  gap: 15px;
+  align-items: center;
+}
+.control-row-left {
+  display: flex;
+  align-items: center;
+  min-width: 0;
+}
+.control-row-right {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+}
 .control-group {
   display: flex;
   align-items: center;
   gap: 5px;
+  min-width: 0;
 }
 .control-group label {
   font-size: 12px;
   font-weight: bold;
   color: #555;
   white-space: nowrap;
+}
+.source-select {
+  min-width: 150px;
+  max-width: 300px;
+}
+.model-input {
+  width: 280px;
 }
 .prompt-group {
   flex: 1;
@@ -857,7 +893,7 @@ body {
   color: #333 !important;
   border: 1px solid #ccc !important;
   font-size: 16px !important;
-  height: 42px;
+  align-self: stretch;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -870,6 +906,10 @@ body {
   background: #f8f9fa !important;
   color: #333 !important;
   border: 1px solid #ccc !important;
+  align-self: stretch;
+  display: flex;
+  align-items: center;
+  justify-content: center;
 }
 .controls-container button {
   background: #007bff;
@@ -923,7 +963,6 @@ body {
   transform: none !important;
 }
 .action-btn {
-  margin-left: auto;
   height: 48px; /* Increased height */
   padding: 0 24px !important;
   min-width: 240px; /* Standardize width */
@@ -943,7 +982,6 @@ body {
   border-bottom-width: 2px !important;
 }
 .load-btn {
-  margin-left: auto;
   background: #00a8ff !important; /* Brighter blue */
   color: white;
   border: none;
