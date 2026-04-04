@@ -1,0 +1,2 @@
+import { i as e } from './index.js'
+export { e as Mermaid }

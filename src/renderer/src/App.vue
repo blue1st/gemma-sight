@@ -1,0 +1,540 @@
+<script setup lang="ts">
+import { onMounted, onUnmounted, ref } from 'vue'
+
+interface ScreenSource {
+  id: string
+  name: string
+  display_id: string
+}
+
+const sourceType = ref<'screen' | 'webcam'>('screen')
+const selectedSourceId = ref<string>('')
+const screenSources = ref<ScreenSource[]>([])
+const webcamSources = ref<MediaDeviceInfo[]>([])
+const videoRef = ref<HTMLVideoElement | null>(null)
+const canvasRef = ref<HTMLCanvasElement | null>(null)
+
+// Crop Box State
+const cropBox = ref({ x: 50, y: 50, width: 200, height: 150 })
+const isDragging = ref(false)
+const isResizing = ref(false)
+const dragStart = ref({ x: 0, y: 0 })
+const initialBox = ref({ x: 0, y: 0, width: 0, height: 0 })
+
+const modelId = ref('onnx-community/gemma-4-E2B-it-ONNX')
+const promptText = ref('Describe this image in Japanese.')
+const resultText = ref('')
+const isLoading = ref(false)
+const modelStatus = ref('Ready to load')
+const loadProgress = ref(0)
+const isCopied = ref(false)
+const isStreaming = ref(false)
+
+let worker: Worker | null = null
+
+function toggleStreaming(): void {
+  isStreaming.value = !isStreaming.value
+  if (isStreaming.value) {
+    captureAndAnalyze()
+  }
+}
+
+async function copyToClipboard(): Promise<void> {
+  if (!resultText.value) return
+  try {
+    await navigator.clipboard.writeText(resultText.value)
+    isCopied.value = true
+    setTimeout(() => {
+      isCopied.value = false
+    }, 2000)
+  } catch (err) {
+    console.error('Failed to copy:', err)
+  }
+}
+
+function initWorker(): void {
+  if (worker) return
+  worker = new Worker(new URL('./worker.ts', import.meta.url), {
+    type: 'module'
+  })
+
+  worker.onmessage = (e): void => {
+    const { type, payload, error } = e.data
+    switch (type) {
+      case 'progress':
+        if (payload.status === 'progress') {
+          loadProgress.value = payload.progress
+        }
+        modelStatus.value = `Loading: ${payload.file || ''} (${Math.round(payload.progress || 0)}%)`
+        break
+      case 'loaded':
+        isLoading.value = false
+        modelStatus.value = 'Model Loaded Successfully'
+        loadProgress.value = 100
+        break
+      case 'chunk':
+        resultText.value += payload
+        break
+      case 'generated':
+        isLoading.value = false
+        resultText.value = payload
+        // Trigger next capture if streaming
+        if (isStreaming.value) {
+          setTimeout(() => {
+            if (isStreaming.value) captureAndAnalyze()
+          }, 500)
+        }
+        break
+      case 'error':
+        isLoading.value = false
+        isStreaming.value = false
+        modelStatus.value = `Error: ${error}`
+        resultText.value = `Error: ${error}`
+        break
+    }
+  }
+}
+
+async function fetchSources(): Promise<void> {
+  // Fetch screen/window sources
+  const sSources = await window.electron.ipcRenderer.invoke('get-desktop-sources', {
+    types: ['screen', 'window']
+  })
+  screenSources.value = sSources
+
+  // Fetch webcam sources
+  try {
+    const devices = await navigator.mediaDevices.enumerateDevices()
+    webcamSources.value = devices.filter((device) => device.kind === 'videoinput')
+  } catch (err) {
+    console.error('Failed to get webcam devices:', err)
+  }
+
+  // Set default source if none selected
+  if (!selectedSourceId.value) {
+    if (sourceType.value === 'screen' && screenSources.value.length > 0) {
+      selectedSourceId.value = screenSources.value[0].id
+      startStream()
+    } else if (sourceType.value === 'webcam' && webcamSources.value.length > 0) {
+      selectedSourceId.value = webcamSources.value[0].deviceId
+      startStream()
+    }
+  }
+}
+
+onMounted(async () => {
+  await fetchSources()
+})
+
+async function onSourceTypeChange(): Promise<void> {
+  selectedSourceId.value = ''
+  if (sourceType.value === 'screen' && screenSources.value.length > 0) {
+    selectedSourceId.value = screenSources.value[0].id
+  } else if (sourceType.value === 'webcam' && webcamSources.value.length > 0) {
+    selectedSourceId.value = webcamSources.value[0].deviceId
+  }
+  startStream()
+}
+
+async function startStream(): Promise<void> {
+  const sourceId = selectedSourceId.value
+  try {
+    let stream: MediaStream
+    if (sourceType.value === 'screen') {
+      if (!sourceId) return
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      stream = await navigator.mediaDevices.getUserMedia({
+        audio: false,
+        video: {
+          mandatory: {
+            chromeMediaSource: 'desktop',
+            chromeMediaSourceId: sourceId
+          }
+        } as any
+      })
+    } else {
+      stream = await navigator.mediaDevices.getUserMedia({
+        audio: false,
+        video: sourceId ? { deviceId: { exact: sourceId } } : true
+      })
+    }
+
+    if (videoRef.value) {
+      videoRef.value.srcObject = stream
+      videoRef.value.play()
+    }
+  } catch (err) {
+    console.error('Failed to get stream:', err)
+  }
+}
+
+async function loadModel(): Promise<void> {
+  if (isLoading.value) return
+  initWorker()
+  isLoading.value = true
+  modelStatus.value = `Initializing model ${modelId.value}...`
+  worker?.postMessage({
+    type: 'load',
+    payload: { modelId: modelId.value }
+  })
+}
+
+async function captureAndAnalyze(): Promise<void> {
+  if (!worker) {
+    await loadModel()
+  }
+
+  if (!videoRef.value || !canvasRef.value) return
+
+  const video = videoRef.value
+  const canvas = canvasRef.value
+  const ctx = canvas.getContext('2d')
+  if (!ctx) return
+
+  // The video element's displayed size vs intrinsic size
+  const scaleX = video.videoWidth / video.clientWidth
+  const scaleY = video.videoHeight / video.clientHeight
+
+  const cropX = cropBox.value.x * scaleX
+  const cropY = cropBox.value.y * scaleY
+  const cropW = cropBox.value.width * scaleX
+  const cropH = cropBox.value.height * scaleY
+
+  canvas.width = cropW
+  canvas.height = cropH
+
+  // Draw the cropped portion
+  ctx.drawImage(video, cropX, cropY, cropW, cropH, 0, 0, cropW, cropH)
+
+  const dataUrl = canvas.toDataURL('image/jpeg')
+
+  isLoading.value = true
+  resultText.value = ''
+
+  worker?.postMessage({
+    type: 'generate',
+    payload: {
+      promptText: promptText.value,
+      dataUrl
+    }
+  })
+}
+
+// --- Box Drag / Resize Logic ---
+function onBoxMouseDown(event: MouseEvent): void {
+  isDragging.value = true
+  dragStart.value = { x: event.clientX, y: event.clientY }
+  initialBox.value = { ...cropBox.value }
+  window.addEventListener('mousemove', onMouseMove)
+  window.addEventListener('mouseup', onMouseUp)
+}
+
+function onHandleMouseDown(event: MouseEvent): void {
+  event.stopPropagation()
+  isResizing.value = true
+  dragStart.value = { x: event.clientX, y: event.clientY }
+  initialBox.value = { ...cropBox.value }
+  window.addEventListener('mousemove', onMouseMove)
+  window.addEventListener('mouseup', onMouseUp)
+}
+
+function onMouseMove(event: MouseEvent): void {
+  const dx = event.clientX - dragStart.value.x
+  const dy = event.clientY - dragStart.value.y
+
+  if (isDragging.value) {
+    cropBox.value.x = initialBox.value.x + dx
+    cropBox.value.y = initialBox.value.y + dy
+  } else if (isResizing.value) {
+    cropBox.value.width = Math.max(50, initialBox.value.width + dx)
+    cropBox.value.height = Math.max(50, initialBox.value.height + dy)
+  }
+}
+
+function onMouseUp(): void {
+  isDragging.value = false
+  isResizing.value = false
+  window.removeEventListener('mousemove', onMouseMove)
+  window.removeEventListener('mouseup', onMouseUp)
+}
+
+onUnmounted(() => {
+  window.removeEventListener('mousemove', onMouseMove)
+  window.removeEventListener('mouseup', onMouseUp)
+  worker?.terminate()
+})
+</script>
+
+<template>
+  <div class="app-container">
+    <header class="header">
+      <h1>Screen Vision Analyzer</h1>
+      <div class="controls">
+        <div class="control-group">
+          <label>Source Type</label>
+          <select v-model="sourceType" @change="onSourceTypeChange">
+            <option value="screen">Screen / Window</option>
+            <option value="webcam">WebCam</option>
+          </select>
+        </div>
+
+        <div class="control-group">
+          <label>Source</label>
+          <select v-model="selectedSourceId" @change="startStream">
+            <template v-if="sourceType === 'screen'">
+              <option v-for="s in screenSources" :key="s.id" :value="s.id">
+                {{ s.name }}
+              </option>
+            </template>
+            <template v-else>
+              <option v-for="w in webcamSources" :key="w.deviceId" :value="w.deviceId">
+                {{ w.label || `Camera ${w.deviceId}` }}
+              </option>
+            </template>
+          </select>
+          <button class="refresh-btn" @click="fetchSources">🔄</button>
+        </div>
+
+        <div class="control-group">
+          <label>Model</label>
+          <input v-model="modelId" placeholder="e.g. google/gemma-4-E2B-it" style="width: 200px" />
+        </div>
+
+        <div class="control-group">
+          <label>Prompt</label>
+          <input v-model="promptText" placeholder="Prompt..." style="width: 200px" />
+        </div>
+
+        <button :disabled="isLoading" @click="loadModel">Load Model</button>
+        <button :disabled="isLoading" @click="captureAndAnalyze">Capture & Analyze</button>
+        <button
+          :style="{ background: isStreaming ? '#ff4757' : '#2ed573' }"
+          @click="toggleStreaming"
+        >
+          {{ isStreaming ? 'Stop Live' : 'Start Live Analysis' }}
+        </button>
+      </div>
+      <div class="status">
+        {{ modelStatus }}
+        <div v-if="loadProgress > 0 && loadProgress < 100" class="progress-bar-container">
+          <div class="progress-bar" :style="{ width: loadProgress + '%' }"></div>
+        </div>
+      </div>
+    </header>
+
+    <div class="main-content">
+      <div class="video-container">
+        <!-- eslint-disable-next-line vue/html-self-closing -->
+        <video ref="videoRef"></video>
+
+        <!-- Selection Box Overlay -->
+        <div
+          class="crop-box"
+          :style="{
+            left: cropBox.x + 'px',
+            top: cropBox.y + 'px',
+            width: cropBox.width + 'px',
+            height: cropBox.height + 'px'
+          }"
+          @mousedown="onBoxMouseDown"
+        >
+          <div class="resize-handle" @mousedown="onHandleMouseDown"></div>
+        </div>
+      </div>
+
+      <div class="sidebar">
+        <div class="sidebar-header">
+          <h3>Analysis Result</h3>
+          <button class="copy-btn" :disabled="!resultText || isLoading" @click="copyToClipboard">
+            {{ isCopied ? 'Copied!' : 'Copy Result' }}
+          </button>
+        </div>
+        <p v-if="isLoading" class="loading">Processing...</p>
+        <pre v-else class="result">{{ resultText }}</pre>
+
+        <!-- Hidden canvas for cropping -->
+        <canvas ref="canvasRef" style="display: none"></canvas>
+      </div>
+    </div>
+  </div>
+</template>
+
+<style>
+* {
+  box-sizing: border-box;
+}
+body {
+  margin: 0;
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+  background-color: #f7f9fc;
+  color: #333;
+}
+.app-container {
+  display: flex;
+  flex-direction: column;
+  height: 100vh;
+}
+.header {
+  background: white;
+  padding: 15px 20px;
+  border-bottom: 1px solid #ddd;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.05);
+}
+.header h1 {
+  margin: 0 0 10px 0;
+  font-size: 20px;
+}
+.controls {
+  display: flex;
+  gap: 10px;
+  align-items: center;
+  flex-wrap: wrap;
+}
+.controls select,
+.controls input,
+.controls button {
+  padding: 8px 12px;
+  border: 1px solid #ccc;
+  border-radius: 6px;
+  font-size: 14px;
+}
+.control-group {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+}
+.control-group label {
+  font-size: 12px;
+  font-weight: bold;
+  color: #555;
+  white-space: nowrap;
+}
+.refresh-btn {
+  padding: 4px 8px !important;
+  background: #f8f9fa !important;
+  color: #333 !important;
+  border: 1px solid #ccc !important;
+}
+.controls button {
+  background: #007bff;
+  color: white;
+  border: none;
+  cursor: pointer;
+  transition:
+    background 0.2s,
+    transform 0.1s;
+}
+.controls button:active {
+  transform: translateY(1px);
+}
+.controls button:hover:not(:disabled) {
+  background: #0056b3;
+}
+.controls button:disabled {
+  background: #aaa;
+  cursor: not-allowed;
+}
+.status {
+  margin-top: 10px;
+  font-size: 13px;
+  color: #666;
+}
+.main-content {
+  display: flex;
+  flex: 1;
+  overflow: hidden;
+  padding: 20px;
+  gap: 20px;
+}
+.video-container {
+  flex: 2;
+  position: relative;
+  background: #000;
+  border-radius: 8px;
+  overflow: hidden;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.video-container video {
+  max-width: 100%;
+  max-height: 100%;
+  pointer-events: none; /* Let events pass to crop block if needed, but here actually we position absolute */
+}
+.crop-box {
+  position: absolute;
+  border: 3px dashed #00ff00;
+  background: rgba(0, 255, 0, 0.1);
+  cursor: move;
+  box-shadow: 0 0 0 9999px rgba(0, 0, 0, 0.5);
+  /* The shadow dims everything OUTSIDE the box */
+}
+.resize-handle {
+  position: absolute;
+  right: -5px;
+  bottom: -5px;
+  width: 15px;
+  height: 15px;
+  background: #ff0000;
+  border-radius: 50%;
+  cursor: se-resize;
+}
+.sidebar {
+  flex: 1;
+  background: white;
+  border-radius: 8px;
+  padding: 15px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+  display: flex;
+  flex-direction: column;
+}
+.sidebar h3 {
+  margin: 0;
+}
+.sidebar-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 10px;
+}
+.copy-btn {
+  background: #28a745 !important;
+  color: white;
+  border: none;
+  padding: 4px 8px !important;
+  font-size: 12px !important;
+  cursor: pointer;
+  border-radius: 4px;
+}
+.copy-btn:disabled {
+  background: #ccc !important;
+  cursor: not-allowed;
+}
+.result {
+  flex: 1;
+  background: #f1f3f5;
+  padding: 10px;
+  border-radius: 6px;
+  overflow: auto;
+  font-size: 13px;
+  white-space: pre-wrap;
+  word-wrap: break-word;
+}
+.loading {
+  color: #007bff;
+  font-weight: bold;
+}
+.progress-bar-container {
+  width: 100%;
+  height: 4px;
+  background: #eee;
+  border-radius: 2px;
+  margin-top: 5px;
+  overflow: hidden;
+}
+.progress-bar {
+  height: 100%;
+  background: #007bff;
+  transition: width 0.3s ease;
+}
+</style>
