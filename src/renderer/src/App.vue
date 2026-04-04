@@ -7,7 +7,7 @@ interface ScreenSource {
   display_id: string
 }
 
-const sourceType = ref<'screen' | 'webcam'>('screen')
+const sourceType = ref<'screen' | 'webcam' | 'video'>('screen')
 const selectedSourceId = ref<string>('')
 const selectedAudioSourceId = ref<string>('')
 const screenSources = ref<ScreenSource[]>([])
@@ -15,6 +15,7 @@ const webcamSources = ref<MediaDeviceInfo[]>([])
 const audioSources = ref<MediaDeviceInfo[]>([])
 const includeAudio = ref(false)
 const videoRef = ref<HTMLVideoElement | null>(null)
+const videoFilePath = ref('')
 const canvasRef = ref<HTMLCanvasElement | null>(null)
 
 // Crop Box State
@@ -311,6 +312,43 @@ async function fetchSources(): Promise<void> {
   }
 }
 
+async function selectVideoFile(): Promise<void> {
+  const filePath = await window.electron.ipcRenderer.invoke('select-video-file')
+  if (!filePath) return
+
+  videoFilePath.value = filePath
+
+  const video = videoRef.value
+  if (!video) return
+
+  // Stop any existing streams
+  if (video.srcObject) {
+    const stream = video.srcObject as MediaStream
+    stream.getTracks().forEach((t) => t.stop())
+    video.srcObject = null
+  }
+
+  // Use custom protocol registered in main process
+  video.src = `local-video://${filePath}`
+  video.load()
+  console.log('Video src set to:', video.src)
+}
+
+// Debug: monitor video element events
+watch(videoRef, (video) => {
+  if (!video) return
+  video.addEventListener('error', () => {
+    const err = video.error
+    console.error('Video error:', err?.code, err?.message)
+  })
+  video.addEventListener('loadeddata', () => {
+    console.log('Video loadeddata: ready to play', video.videoWidth, 'x', video.videoHeight)
+  })
+  video.addEventListener('canplay', () => {
+    console.log('Video canplay event fired')
+  })
+})
+
 onMounted(async () => {
   await fetchSources()
   if (includeAudio.value) {
@@ -319,13 +357,21 @@ onMounted(async () => {
 })
 
 async function onSourceTypeChange(): Promise<void> {
+  // Clean up previous video source
+  if (videoRef.value) {
+    videoRef.value.pause()
+    videoRef.value.removeAttribute('src')
+    videoRef.value.load()
+  }
+
   selectedSourceId.value = ''
   if (sourceType.value === 'screen' && screenSources.value.length > 0) {
     selectedSourceId.value = screenSources.value[0].id
+    startStream()
   } else if (sourceType.value === 'webcam' && webcamSources.value.length > 0) {
     selectedSourceId.value = webcamSources.value[0].deviceId
+    startStream()
   }
-  startStream()
 }
 
 async function startStream(): Promise<void> {
@@ -382,6 +428,11 @@ async function captureAndAnalyze(): Promise<void> {
   if (!video || !canvas) return
   const ctx = canvas.getContext('2d')
   if (!ctx) return
+
+  if (video.readyState < 2 || !video.videoWidth || !video.videoHeight) {
+    console.warn('Video not ready for capture')
+    return
+  }
 
   const vWidth = video.videoWidth
   const vHeight = video.videoHeight
@@ -532,10 +583,11 @@ onUnmounted(() => {
             <select v-model="sourceType" @change="onSourceTypeChange">
               <option value="screen">Screen / Window</option>
               <option value="webcam">WebCam</option>
+              <option value="video">Video File</option>
             </select>
           </div>
 
-          <div class="control-group">
+          <div v-if="sourceType !== 'video'" class="control-group">
             <label>Source</label>
             <select v-model="selectedSourceId" @change="startStream">
               <template v-if="sourceType === 'screen'">
@@ -543,13 +595,23 @@ onUnmounted(() => {
                   {{ s.name }}
                 </option>
               </template>
-              <template v-else>
+              <template v-else-if="sourceType === 'webcam'">
                 <option v-for="w in webcamSources" :key="w.deviceId" :value="w.deviceId">
                   {{ w.label || `Camera ${w.deviceId}` }}
                 </option>
               </template>
             </select>
             <button class="refresh-btn" @click="fetchSources">🔄</button>
+          </div>
+
+          <div v-if="sourceType === 'video'" class="control-group">
+            <label>Video File</label>
+            <button class="load-btn" @click="selectVideoFile">
+              {{ videoFilePath ? 'Change File' : 'Select File' }}
+            </button>
+            <span v-if="videoFilePath" class="video-file-name" :title="videoFilePath">
+              {{ videoFilePath.split('/').pop() }}
+            </span>
           </div>
 
           <div class="control-group">
@@ -644,10 +706,11 @@ onUnmounted(() => {
     <div class="main-content">
       <div class="video-container">
         <!-- eslint-disable-next-line vue/html-self-closing -->
-        <video ref="videoRef"></video>
+        <video ref="videoRef" :controls="sourceType === 'video'" playsinline></video>
 
-        <!-- Selection Box Overlay -->
+        <!-- Selection Box Overlay (hidden in video file mode) -->
         <div
+          v-if="sourceType !== 'video'"
           class="crop-box"
           :style="{
             left: cropBox.x + 'px',
@@ -910,17 +973,18 @@ body {
   background: #000;
   border-radius: 8px;
   overflow: hidden;
-  display: flex;
-  align-items: center;
-  justify-content: center;
 }
 .video-container video {
-  max-width: 100%;
-  max-height: 100%;
-  pointer-events: none; /* Let events pass to crop block if needed, but here actually we position absolute */
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+  position: relative;
+  z-index: 1;
 }
 .crop-box {
   position: absolute;
+  z-index: 2;
   border: 3px dashed #00ff00;
   background: rgba(0, 255, 0, 0.1);
   cursor: move;
@@ -936,6 +1000,14 @@ body {
   background: #ff0000;
   border-radius: 50%;
   cursor: se-resize;
+}
+.video-file-name {
+  font-size: 12px;
+  color: #666;
+  max-width: 200px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 .sidebar {
   flex: 1;
