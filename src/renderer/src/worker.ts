@@ -49,6 +49,7 @@ self.onmessage = async (e: MessageEvent) => {
         }
       ]
 
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
       const prompt = await (processor as any).apply_chat_template(messages, {
         enable_thinking: false,
         add_generation_prompt: true
@@ -66,6 +67,7 @@ self.onmessage = async (e: MessageEvent) => {
         }
       })
 
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
       const outputs = await (model as any).generate({
         ...inputs,
         max_new_tokens: 512,
@@ -74,6 +76,7 @@ self.onmessage = async (e: MessageEvent) => {
       })
 
       const decoded = processor.batch_decode(
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
         outputs.slice(null, [(inputs as any).input_ids.dims.at(-1), null]),
         { skip_special_tokens: true }
       )

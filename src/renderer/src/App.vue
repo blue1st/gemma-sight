@@ -228,7 +228,6 @@ async function startStream(): Promise<void> {
     let stream: MediaStream
     if (sourceType.value === 'screen') {
       if (!sourceId) return
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
       stream = await navigator.mediaDevices.getUserMedia({
         audio: false,
         video: {
@@ -236,6 +235,7 @@ async function startStream(): Promise<void> {
             chromeMediaSource: 'desktop',
             chromeMediaSourceId: sourceId
           }
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
         } as any
       })
     } else {
