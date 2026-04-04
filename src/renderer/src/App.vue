@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { onMounted, onUnmounted, ref } from 'vue'
+import { onMounted, onUnmounted, ref, watch, nextTick } from 'vue'
 
 interface ScreenSource {
   id: string
@@ -29,6 +29,21 @@ const modelStatus = ref('Ready to load')
 const loadProgress = ref(0)
 const isCopied = ref(false)
 const isStreaming = ref(false)
+const isModelLoaded = ref(false)
+const resultRef = ref<HTMLPreElement | null>(null)
+
+// Auto-scroll logic
+watch(resultText, () => {
+  nextTick(() => {
+    if (resultRef.value) {
+      resultRef.value.scrollTop = resultRef.value.scrollHeight
+    }
+  })
+})
+
+function clearResult(): void {
+  resultText.value = ''
+}
 
 let worker: Worker | null = null
 
@@ -71,13 +86,20 @@ function initWorker(): void {
         isLoading.value = false
         modelStatus.value = 'Model Loaded Successfully'
         loadProgress.value = 100
+        isModelLoaded.value = true
         break
       case 'chunk':
         resultText.value += payload
         break
       case 'generated':
         isLoading.value = false
-        resultText.value = payload
+        if (!isStreaming.value) {
+          resultText.value = payload
+        } else {
+          // In streaming mode, chunks already populated resultText.
+          // We just add a double newline to separate from next capture.
+          resultText.value += '\n'
+        }
         // Trigger next capture if streaming
         if (isStreaming.value) {
           setTimeout(() => {
@@ -209,7 +231,12 @@ async function captureAndAnalyze(): Promise<void> {
   const dataUrl = canvas.toDataURL('image/jpeg')
 
   isLoading.value = true
-  resultText.value = ''
+  if (isStreaming.value) {
+    const timestamp = new Date().toLocaleTimeString()
+    resultText.value += `\n[${timestamp}] `
+  } else {
+    resultText.value = ''
+  }
 
   worker?.postMessage({
     type: 'generate',
@@ -297,7 +324,12 @@ onUnmounted(() => {
 
         <div class="control-group">
           <label>Model</label>
-          <input v-model="modelId" placeholder="e.g. google/gemma-4-E2B-it" style="width: 200px" />
+          <input
+            v-model="modelId"
+            placeholder="e.g. google/gemma-4-E2B-it"
+            style="width: 200px"
+            readonly
+          />
         </div>
 
         <div class="control-group">
@@ -306,9 +338,12 @@ onUnmounted(() => {
         </div>
 
         <button :disabled="isLoading" @click="loadModel">Load Model</button>
-        <button :disabled="isLoading" @click="captureAndAnalyze">Capture & Analyze</button>
+        <button :disabled="!isModelLoaded || isLoading" @click="captureAndAnalyze">
+          Capture & Analyze
+        </button>
         <button
-          :style="{ background: isStreaming ? '#ff4757' : '#2ed573' }"
+          :disabled="!isModelLoaded"
+          :style="isModelLoaded ? { background: isStreaming ? '#ff4757' : '#2ed573' } : {}"
           @click="toggleStreaming"
         >
           {{ isStreaming ? 'Stop Live' : 'Start Live Analysis' }}
@@ -345,12 +380,23 @@ onUnmounted(() => {
       <div class="sidebar">
         <div class="sidebar-header">
           <h3>Analysis Result</h3>
-          <button class="copy-btn" :disabled="!resultText || isLoading" @click="copyToClipboard">
-            {{ isCopied ? 'Copied!' : 'Copy Result' }}
-          </button>
+          <div class="sidebar-actions">
+            <button
+              class="clear-btn"
+              :disabled="!resultText || isLoading"
+              @click="clearResult"
+            >
+              Clear
+            </button>
+            <button class="copy-btn" :disabled="!resultText || isLoading" @click="copyToClipboard">
+              {{ isCopied ? 'Copied!' : 'Copy Result' }}
+            </button>
+          </div>
         </div>
-        <p v-if="isLoading" class="loading">Processing...</p>
-        <pre v-else class="result">{{ resultText }}</pre>
+        <div class="result-container">
+          <pre ref="resultRef" class="result">{{ resultText }}</pre>
+          <div v-if="isLoading" class="loading-indicator">Processing...</div>
+        </div>
 
         <!-- Hidden canvas for cropping -->
         <canvas ref="canvasRef" style="display: none"></canvas>
@@ -497,6 +543,23 @@ body {
   align-items: center;
   margin-bottom: 10px;
 }
+.sidebar-actions {
+  display: flex;
+  gap: 8px;
+}
+.clear-btn {
+  background: #6c757d !important;
+  color: white;
+  border: none;
+  padding: 4px 8px !important;
+  font-size: 12px !important;
+  cursor: pointer;
+  border-radius: 4px;
+}
+.clear-btn:disabled {
+  background: #ccc !important;
+  cursor: not-allowed;
+}
 .copy-btn {
   background: #28a745 !important;
   color: white;
@@ -510,6 +573,13 @@ body {
   background: #ccc !important;
   cursor: not-allowed;
 }
+.result-container {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  position: relative;
+  min-height: 0;
+}
 .result {
   flex: 1;
   background: #f1f3f5;
@@ -519,6 +589,18 @@ body {
   font-size: 13px;
   white-space: pre-wrap;
   word-wrap: break-word;
+  margin: 0;
+}
+.loading-indicator {
+  position: absolute;
+  bottom: 10px;
+  right: 20px;
+  background: rgba(255, 255, 255, 0.8);
+  padding: 2px 8px;
+  border-radius: 4px;
+  font-size: 11px;
+  color: #007bff;
+  font-weight: bold;
 }
 .loading {
   color: #007bff;

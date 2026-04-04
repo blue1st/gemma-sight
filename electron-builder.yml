@@ -5,6 +5,7 @@ directories:
 files:
   - '!**/.vscode/*'
   - '!src/*'
+  - '!Gemma-4-WebGPU/*'
   - '!electron.vite.config.{js,ts,mjs,cjs}'
   - '!{.eslintcache,eslint.config.mjs,.prettierignore,.prettierrc.yaml,dev-app-update.yml,CHANGELOG.md,README.md}'
   - '!{.env,.env.*,.npmrc,pnpm-lock.yaml}'
@@ -13,6 +14,11 @@ asarUnpack:
   - resources/**
 win:
   executableName: gemmasight
+  target:
+    - nsis
+  arch:
+    - x64
+    - arm64
 nsis:
   artifactName: ${name}-${version}-setup.${ext}
   shortcutName: ${productName}
@@ -20,6 +26,12 @@ nsis:
   createDesktopShortcut: always
 mac:
   entitlementsInherit: build/entitlements.mac.plist
+  target:
+    - dmg
+    - zip
+  arch:
+    - x64
+    - arm64
   extendInfo:
     - NSCameraUsageDescription: Application requests access to the device's camera.
     - NSMicrophoneUsageDescription: Application requests access to the device's microphone.
@@ -40,5 +52,3 @@ appImage:
 npmRebuild: false
 publish:
   provider: github
-  owner: t-kawasaki
-  repo: gemma-sight
