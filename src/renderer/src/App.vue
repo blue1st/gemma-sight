@@ -34,6 +34,9 @@ const isLoading = ref(false)
 const modelStatus = ref('Ready to load')
 const loadProgress = ref(0)
 const isCopied = ref(false)
+const isSaved = ref(false)
+const isStreamingToFile = ref(false)
+const streamingFilePath = ref('')
 const isStreaming = ref(false)
 const isModelLoaded = ref(false)
 const resultRef = ref<HTMLPreElement | null>(null)
@@ -73,6 +76,35 @@ async function copyToClipboard(): Promise<void> {
   }
 }
 
+async function saveToFile(): Promise<void> {
+  if (!resultText.value) return
+  try {
+    const success = await window.electron.ipcRenderer.invoke(
+      'save-analysis-result',
+      resultText.value
+    )
+    if (success) {
+      isSaved.value = true
+      setTimeout(() => {
+        isSaved.value = false
+      }, 2000)
+    }
+  } catch (err) {
+    console.error('Failed to save file:', err)
+  }
+}
+
+async function selectStreamingFile(): Promise<void> {
+  try {
+    const path = await window.electron.ipcRenderer.invoke('select-output-file')
+    if (path) {
+      streamingFilePath.value = path
+    }
+  } catch (err) {
+    console.error('Failed to select file:', err)
+  }
+}
+
 function initWorker(): void {
   if (worker) return
   worker = new Worker(new URL('./worker.ts', import.meta.url), {
@@ -96,15 +128,33 @@ function initWorker(): void {
         break
       case 'chunk':
         resultText.value += payload
+        if (isStreamingToFile.value && streamingFilePath.value) {
+          window.electron.ipcRenderer.invoke('append-to-file', {
+            filePath: streamingFilePath.value,
+            content: payload
+          })
+        }
         break
       case 'generated':
         isLoading.value = false
         if (!isStreaming.value) {
           resultText.value = payload
+          if (isStreamingToFile.value && streamingFilePath.value) {
+            window.electron.ipcRenderer.invoke('append-to-file', {
+              filePath: streamingFilePath.value,
+              content: payload + '\n'
+            })
+          }
         } else {
           // In streaming mode, chunks already populated resultText.
           // We just add a double newline to separate from next capture.
           resultText.value += '\n'
+          if (isStreamingToFile.value && streamingFilePath.value) {
+            window.electron.ipcRenderer.invoke('append-to-file', {
+              filePath: streamingFilePath.value,
+              content: '\n'
+            })
+          }
         }
         // Trigger next capture if streaming
         if (isStreaming.value) {
@@ -239,7 +289,14 @@ async function captureAndAnalyze(): Promise<void> {
   isLoading.value = true
   if (isStreaming.value) {
     const timestamp = new Date().toLocaleTimeString()
-    resultText.value += `\n[${timestamp}] `
+    const header = `\n[${timestamp}] `
+    resultText.value += header
+    if (isStreamingToFile.value && streamingFilePath.value) {
+      window.electron.ipcRenderer.invoke('append-to-file', {
+        filePath: streamingFilePath.value,
+        content: header
+      })
+    }
   } else {
     resultText.value = ''
   }
@@ -404,11 +461,33 @@ onUnmounted(() => {
             <button class="copy-btn" :disabled="!resultText || isLoading" @click="copyToClipboard">
               {{ isCopied ? 'Copied!' : 'Copy Result' }}
             </button>
+            <button class="save-btn" :disabled="!resultText || isLoading" @click="saveToFile">
+              {{ isSaved ? 'Saved!' : 'Save' }}
+            </button>
           </div>
         </div>
         <div class="result-container">
           <pre ref="resultRef" class="result">{{ resultText }}</pre>
           <div v-if="isLoading" class="loading-indicator">Processing...</div>
+        </div>
+
+        <div class="streaming-config">
+          <div class="config-row">
+            <label class="checkbox-label">
+              <input v-model="isStreamingToFile" type="checkbox" />
+              Stream to File
+            </label>
+            <button
+              class="select-path-btn"
+              :title="streamingFilePath || 'No file selected'"
+              @click="selectStreamingFile"
+            >
+              {{ streamingFilePath ? 'Change File' : 'Select File' }}
+            </button>
+          </div>
+          <div v-if="streamingFilePath" class="path-display" :title="streamingFilePath">
+            {{ streamingFilePath }}
+          </div>
         </div>
 
         <!-- Hidden canvas for cropping -->
@@ -629,6 +708,19 @@ body {
   border-radius: 4px;
 }
 .copy-btn:disabled {
+  background: #ccc !important;
+  cursor: not-allowed;
+}
+.save-btn {
+  background: #007bff !important;
+  color: white;
+  border: none;
+  padding: 4px 8px !important;
+  font-size: 12px !important;
+  cursor: pointer;
+  border-radius: 4px;
+}
+.save-btn:disabled {
   background: #ccc !important;
   cursor: not-allowed;
 }

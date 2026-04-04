@@ -1,4 +1,4 @@
-import { app, shell, BrowserWindow, ipcMain, desktopCapturer } from 'electron'
+import { app, shell, BrowserWindow, ipcMain, desktopCapturer, dialog } from 'electron'
 import { join } from 'path'
 import { electronApp, optimizer, is } from '@electron-toolkit/utils'
 import icon from '../../resources/icon.png?asset'
@@ -60,6 +60,48 @@ app.whenReady().then(() => {
       display_id: source.display_id
     }))
   })
+
+  ipcMain.handle('save-analysis-result', async (_, content: string) => {
+    const { filePath, canceled } = await dialog.showSaveDialog({
+      title: 'Save Analysis Result',
+      defaultPath: `analysis-${new Date().toISOString().replace(/[:.]/g, '-')}.txt`,
+      filters: [{ name: 'Text Files', extensions: ['txt'] }]
+    })
+
+    if (canceled || !filePath) return false
+
+    try {
+      const fs = await import('fs/promises')
+      await fs.writeFile(filePath, content, 'utf8')
+      return true
+    } catch (err) {
+      console.error('Failed to save file:', err)
+      return false
+    }
+  })
+
+  ipcMain.handle('select-output-file', async () => {
+    const { filePath, canceled } = await dialog.showSaveDialog({
+      title: 'Select Output File for Streaming',
+      defaultPath: 'streaming-output.txt',
+      filters: [{ name: 'Text Files', extensions: ['txt'] }]
+    })
+    return canceled ? null : filePath
+  })
+
+  ipcMain.handle(
+    'append-to-file',
+    async (_, { filePath, content }: { filePath: string; content: string }) => {
+      try {
+        const fs = await import('fs/promises')
+        await fs.appendFile(filePath, content, 'utf8')
+        return true
+      } catch (err) {
+        console.error('Failed to append to file:', err)
+        return false
+      }
+    }
+  )
 
   createWindow()
 
