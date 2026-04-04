@@ -39,25 +39,54 @@ self.onmessage = async (e: MessageEvent) => {
       if (!processor || !model) {
         throw new Error('Model or processor not loaded')
       }
-      const { promptText, dataUrl } = payload
+      const { promptText, dataUrl, audioData, samplingRate } = payload
       const rawImage = await RawImage.fromURL(dataUrl)
+
+      if (audioData) {
+        const sum = audioData.reduce((acc: number, val: number) => acc + Math.abs(val), 0)
+        console.log('Audio data received in worker:', {
+          length: audioData.length,
+          avgAmplitude: sum / audioData.length,
+          samplingRate
+        })
+      }
 
       const messages = [
         {
           role: 'user',
-          content: [{ type: 'image' }, { type: 'text', text: promptText }]
+          content: [
+            { type: 'image' },
+            ...(audioData ? [{ type: 'audio' }] : []), // Template doesn't need data
+            { type: 'text', text: promptText }
+          ]
         }
       ]
 
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const prompt = await (processor as any).apply_chat_template(messages, {
-        enable_thinking: false,
+      let prompt = await (processor as any).apply_chat_template(messages, {
         add_generation_prompt: true
       })
 
-      const inputs = await processor(prompt, rawImage, null, {
-        add_special_tokens: false
+      console.log('Generated prompt:', prompt)
+
+      // Manual fallback insertion if template skips them (some templates only support text)
+      if (audioData && !prompt.includes('<audio>') && !prompt.includes('<boa>')) {
+        console.warn('Audio marker missing in generated prompt, adding manually.')
+        if (prompt.includes('<image>')) {
+          prompt = prompt.replace('<image>', '<image><audio>')
+        } else if (prompt.includes('<boi>')) {
+          prompt = prompt.replace('<eoi>', '<eoi><audio>')
+        } else {
+          prompt = '<audio>' + prompt
+        }
+      }
+
+      const inputs = await processor(prompt, rawImage, audioData, {
+        add_special_tokens: false,
+        sampling_rate: samplingRate
       })
+
+      console.log('Prepared inputs keys:', Object.keys(inputs))
 
       const streamer = new TextStreamer(processor.tokenizer as PreTrainedTokenizer, {
         skip_prompt: true,

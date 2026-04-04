@@ -9,8 +9,11 @@ interface ScreenSource {
 
 const sourceType = ref<'screen' | 'webcam'>('screen')
 const selectedSourceId = ref<string>('')
+const selectedAudioSourceId = ref<string>('')
 const screenSources = ref<ScreenSource[]>([])
 const webcamSources = ref<MediaDeviceInfo[]>([])
+const audioSources = ref<MediaDeviceInfo[]>([])
+const includeAudio = ref(false)
 const videoRef = ref<HTMLVideoElement | null>(null)
 const canvasRef = ref<HTMLCanvasElement | null>(null)
 
@@ -23,6 +26,7 @@ const initialBox = ref({ x: 0, y: 0, width: 0, height: 0 })
 
 const modelId = ref('onnx-community/gemma-4-E2B-it-ONNX')
 const DEFAULT_PROMPT = 'Describe this image in Japanese.'
+const DEFAULT_MULTIMODAL_PROMPT = 'Describe this image and audio in Japanese.'
 const promptText = ref(DEFAULT_PROMPT)
 
 // Sampling Interval (ms)
@@ -48,6 +52,99 @@ const streamingFilePath = ref('')
 const isStreaming = ref(false)
 const isModelLoaded = ref(false)
 const resultRef = ref<HTMLPreElement | null>(null)
+let audioContext: AudioContext | null = null
+let audioStream: MediaStream | null = null
+const audioBuffer = ref<Float32Array | null>(null)
+const audioVolume = ref(0)
+const audioStatus = ref('')
+let writeIdx = 0
+let animationFrameId: number | null = null
+
+async function startAudioCapture(): Promise<void> {
+  if (audioContext) {
+    audioContext.close()
+  }
+  try {
+    audioStream = await navigator.mediaDevices.getUserMedia({
+      audio: selectedAudioSourceId.value
+        ? { deviceId: { exact: selectedAudioSourceId.value } }
+        : true,
+      video: false
+    })
+
+    console.log('Audio stream obtained:', {
+      active: audioStream.active,
+      tracks: audioStream.getAudioTracks().map((t) => ({ label: t.label, enabled: t.enabled }))
+    })
+
+    audioContext = new AudioContext() // Default sample rate
+    audioStatus.value = `Running (${audioContext.sampleRate}Hz)`
+
+    const source = audioContext.createMediaStreamSource(audioStream)
+    const analyser = audioContext.createAnalyser()
+    analyser.fftSize = 256
+    const processorNode = audioContext.createScriptProcessor(4096, 1, 1)
+
+    // Scaling buffer for 3 seconds of audio regardless of sample rate
+    const totalSamples = audioContext.sampleRate * 3
+    const internalBuffer = new Float32Array(totalSamples)
+    writeIdx = 0
+
+    processorNode.onaudioprocess = (e) => {
+      const input = e.inputBuffer.getChannelData(0)
+      for (let i = 0; i < input.length; i++) {
+        internalBuffer[writeIdx] = input[i]
+        writeIdx = (writeIdx + 1) % totalSamples
+      }
+      audioBuffer.value = internalBuffer
+    }
+
+    const dataArray = new Uint8Array(analyser.frequencyBinCount)
+    const updateVolume = (): void => {
+      analyser.getByteFrequencyData(dataArray)
+      let sum = 0
+      for (let i = 0; i < dataArray.length; i++) {
+        sum += dataArray[i]
+      }
+      audioVolume.value = Math.min(100, (sum / dataArray.length) * 2)
+      animationFrameId = requestAnimationFrame(updateVolume)
+    }
+
+    source.connect(analyser)
+    source.connect(processorNode)
+    processorNode.connect(audioContext.destination)
+    if (audioContext.state === 'suspended') {
+      await audioContext.resume()
+    }
+    updateVolume()
+  } catch (err) {
+    console.error('Failed to start audio capture:', err)
+    audioStatus.value = `Error: ${err instanceof Error ? err.name : 'Unknown'}`
+    if (String(err).includes('NotAllowedError')) {
+      audioStatus.value = 'Microphone access denied. Please grant permission.'
+    }
+  }
+}
+
+watch([includeAudio, selectedAudioSourceId], async () => {
+  if (includeAudio.value) {
+    await startAudioCapture()
+    if (promptText.value === DEFAULT_PROMPT) {
+      promptText.value = DEFAULT_MULTIMODAL_PROMPT
+    }
+  } else if (audioContext) {
+    if (promptText.value === DEFAULT_MULTIMODAL_PROMPT) {
+      promptText.value = DEFAULT_PROMPT
+    }
+    if (animationFrameId) {
+      cancelAnimationFrame(animationFrameId)
+    }
+    audioContext.close()
+    audioContext = null
+    audioStream?.getTracks().forEach((t) => t.stop())
+    audioVolume.value = 0
+  }
+})
 
 // Auto-scroll logic
 watch(resultText, () => {
@@ -188,12 +285,18 @@ async function fetchSources(): Promise<void> {
   })
   screenSources.value = sSources
 
-  // Fetch webcam sources
+  // Fetch webcam and audio sources
   try {
     const devices = await navigator.mediaDevices.enumerateDevices()
     webcamSources.value = devices.filter((device) => device.kind === 'videoinput')
+    audioSources.value = devices.filter((device) => device.kind === 'audioinput')
   } catch (err) {
-    console.error('Failed to get webcam devices:', err)
+    console.error('Failed to get media devices:', err)
+  }
+
+  // Set default source if none selected
+  if (!selectedAudioSourceId.value && audioSources.value.length > 0) {
+    selectedAudioSourceId.value = audioSources.value[0].deviceId
   }
 
   // Set default source if none selected
@@ -210,6 +313,9 @@ async function fetchSources(): Promise<void> {
 
 onMounted(async () => {
   await fetchSources()
+  if (includeAudio.value) {
+    startAudioCapture()
+  }
 })
 
 async function onSourceTypeChange(): Promise<void> {
@@ -270,29 +376,49 @@ async function captureAndAnalyze(): Promise<void> {
     await loadModel()
   }
 
-  if (!videoRef.value || !canvasRef.value) return
-
+  // Drawing the cropped portion with scale correction for object-fit: contain (default)
   const video = videoRef.value
   const canvas = canvasRef.value
+  if (!video || !canvas) return
   const ctx = canvas.getContext('2d')
   if (!ctx) return
 
-  // The video element's displayed size vs intrinsic size
-  const scaleX = video.videoWidth / video.clientWidth
-  const scaleY = video.videoHeight / video.clientHeight
+  const vWidth = video.videoWidth
+  const vHeight = video.videoHeight
+  const cWidth = video.clientWidth
+  const cHeight = video.clientHeight
 
-  const cropX = cropBox.value.x * scaleX
-  const cropY = cropBox.value.y * scaleY
+  const videoAspect = vWidth / vHeight
+  const elementAspect = cWidth / cHeight
+
+  let actualWidth = cWidth
+  let actualHeight = cHeight
+  let marginLeft = 0
+  let marginTop = 0
+
+  if (elementAspect > videoAspect) {
+    actualWidth = cHeight * videoAspect
+    marginLeft = (cWidth - actualWidth) / 2
+  } else {
+    actualHeight = cWidth / videoAspect
+    marginTop = (cHeight - actualHeight) / 2
+  }
+
+  const scaleX = vWidth / actualWidth
+  const scaleY = vHeight / actualHeight
+
+  const cropX = (cropBox.value.x - marginLeft) * scaleX
+  const cropY = (cropBox.value.y - marginTop) * scaleY
   const cropW = cropBox.value.width * scaleX
   const cropH = cropBox.value.height * scaleY
 
-  canvas.width = cropW
-  canvas.height = cropH
+  if (canvas) {
+    canvas.width = cropW
+    canvas.height = cropH
+  }
 
-  // Draw the cropped portion
   ctx.drawImage(video, cropX, cropY, cropW, cropH, 0, 0, cropW, cropH)
-
-  const dataUrl = canvas.toDataURL('image/jpeg')
+  const dataUrl = canvas?.toDataURL('image/jpeg')
 
   isLoading.value = true
   if (isStreaming.value) {
@@ -309,11 +435,44 @@ async function captureAndAnalyze(): Promise<void> {
     resultText.value = ''
   }
 
+  let audioData: Float32Array | null = null
+  if (includeAudio.value && audioBuffer.value && audioContext) {
+    const len = audioBuffer.value.length
+    const rawBuffer = new Float32Array(len)
+    for (let i = 0; i < len; i++) {
+      rawBuffer[i] = audioBuffer.value[(writeIdx + i) % len]
+    }
+
+    // Manual resample to 16kHz if needed
+    if (audioContext.sampleRate !== 16000) {
+      const offlineCtx = new OfflineAudioContext(1, len, audioContext.sampleRate)
+      const buffer = offlineCtx.createBuffer(1, len, audioContext.sampleRate)
+      buffer.copyToChannel(rawBuffer, 0)
+      const source = offlineCtx.createBufferSource()
+      source.buffer = buffer
+
+      const targetRate = 16000
+      const resampledLen = Math.floor(len * (targetRate / audioContext.sampleRate))
+      const resampleOfflineCtx = new OfflineAudioContext(1, resampledLen, targetRate)
+      const resampledSource = resampleOfflineCtx.createBufferSource()
+      resampledSource.buffer = buffer
+      resampledSource.connect(resampleOfflineCtx.destination)
+      resampledSource.start(0)
+
+      const resampledBuffer = await resampleOfflineCtx.startRendering()
+      audioData = resampledBuffer.getChannelData(0)
+    } else {
+      audioData = rawBuffer
+    }
+  }
+
   worker?.postMessage({
     type: 'generate',
     payload: {
       promptText: promptText.value,
-      dataUrl
+      dataUrl,
+      audioData,
+      samplingRate: 16000 // Always 16000 now
     }
   })
 }
@@ -391,6 +550,29 @@ onUnmounted(() => {
               </template>
             </select>
             <button class="refresh-btn" @click="fetchSources">🔄</button>
+          </div>
+
+          <div class="control-group">
+            <label>Audio Source</label>
+            <select v-model="selectedAudioSourceId">
+              <option v-for="a in audioSources" :key="a.deviceId" :value="a.deviceId">
+                {{ a.label || `Audio ${a.deviceId}` }}
+              </option>
+            </select>
+            <div v-if="includeAudio" class="volume-meter" title="Current Audio Level">
+              <div
+                class="volume-level"
+                :style="{
+                  width: audioVolume + '%',
+                  background: audioVolume > 70 ? '#ff4757' : '#2ed573'
+                }"
+              ></div>
+            </div>
+            <div v-if="audioStatus" class="audio-status-label">{{ audioStatus }}</div>
+            <label class="checkbox-label" style="margin-left: 10px">
+              <input v-model="includeAudio" type="checkbox" />
+              Use Audio
+            </label>
           </div>
 
           <div class="control-group">
@@ -634,6 +816,36 @@ body {
   transition:
     background 0.2s,
     transform 0.1s;
+}
+.checkbox-label {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 13px;
+  font-weight: 600;
+  color: #444;
+  cursor: pointer;
+  user-select: none;
+}
+.checkbox-label input {
+  width: 16px;
+  height: 16px;
+  cursor: pointer;
+}
+.volume-meter {
+  width: 60px;
+  height: 8px;
+  background: #eee;
+  border-radius: 4px;
+  overflow: hidden;
+  margin-left: 5px;
+  border: 1px solid #ddd;
+}
+.volume-level {
+  height: 100%;
+  transition:
+    width 0.1s,
+    background 0.2s;
 }
 .controls-container button:active {
   transform: translateY(1px);
