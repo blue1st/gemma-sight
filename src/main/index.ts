@@ -1,15 +1,121 @@
-import {
-  app,
-  shell,
-  BrowserWindow,
-  ipcMain,
-  desktopCapturer,
-  dialog,
-  protocol
-} from 'electron'
+import { app, shell, BrowserWindow, ipcMain, desktopCapturer, dialog, protocol } from 'electron'
 import { join } from 'path'
 import { electronApp, optimizer, is } from '@electron-toolkit/utils'
 import icon from '../../resources/icon.png?asset'
+
+let logWindow: BrowserWindow | null = null
+
+const LOG_WINDOW_HTML = `<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<title>Match Log</title>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+    background: #1a1a2e; color: #eee; padding: 0;
+  }
+  .toolbar {
+    position: sticky; top: 0; z-index: 10;
+    display: flex; justify-content: space-between; align-items: center;
+    padding: 8px 12px; background: #16213e;
+    border-bottom: 1px solid #0f3460;
+  }
+  .toolbar h1 { font-size: 14px; font-weight: 600; color: #e94560; }
+  .toolbar-controls { display: flex; align-items: center; gap: 12px; }
+  .toolbar span { font-size: 12px; color: #888; }
+  .sound-control { display: flex; align-items: center; gap: 4px; font-size: 12px; color: #aaa; cursor: pointer; }
+  .sound-control input { cursor: pointer; }
+  .clear-btn {
+    padding: 4px 12px; border: none; border-radius: 4px;
+    background: #e94560; color: white; font-size: 12px; cursor: pointer;
+  }
+  .clear-btn:hover { background: #c73650; }
+  #log { padding: 4px 0; }
+  .entry {
+    display: flex; gap: 10px; padding: 6px 12px;
+    border-bottom: 1px solid #0f3460; font-size: 12px;
+    align-items: baseline;
+  }
+  .entry:hover { background: rgba(233,69,96,0.08); }
+  .time { color: #53d8fb; font-weight: 600; white-space: nowrap; font-family: monospace; }
+  .match { color: #e94560; font-weight: 600; white-space: nowrap; }
+  .text { color: #aaa; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; flex: 1; min-width: 0; }
+  .empty { text-align: center; padding: 40px; color: #555; font-size: 13px; }
+</style>
+</head>
+<body>
+  <div class="toolbar">
+    <h1>\u{1F514} Match Log</h1>
+    <div class="toolbar-controls">
+      <label class="sound-control">
+        <input type="checkbox" id="playSound" checked> Sound
+      </label>
+      <span id="count">0 entries</span>
+      <button class="clear-btn" onclick="clearLog()">Clear</button>
+    </div>
+  </div>
+  <div id="log"><div class="empty">Waiting for matches...</div></div>
+  <script>
+    const { ipcRenderer } = require('electron');
+    const logEl = document.getElementById('log');
+    const countEl = document.getElementById('count');
+    const playSoundEl = document.getElementById('playSound');
+    let entries = 0;
+
+    // Simple beep sound using Web Audio API
+    function playBeep() {
+      if (!playSoundEl.checked) return;
+      const ctx = new (window.AudioContext || window.webkitAudioContext)();
+      const osc = ctx.createOscillator();
+      const gain = ctx.createGain();
+      osc.type = 'sine';
+      osc.frequency.setValueAtTime(880, ctx.currentTime);
+      gain.gain.setValueAtTime(0.1, ctx.currentTime);
+      gain.gain.exponentialRampToValueAtTime(0.0001, ctx.currentTime + 0.1);
+      osc.connect(gain);
+      gain.connect(ctx.destination);
+      osc.start();
+      osc.stop(ctx.currentTime + 0.1);
+    }
+
+    ipcRenderer.on('notify-log-entry', (_, entry) => {
+      if (entries === 0) logEl.innerHTML = '';
+      entries++;
+      const div = document.createElement('div');
+      div.className = 'entry';
+      div.innerHTML =
+        '<span class="time">' + escHtml(entry.timestamp) + '</span>' +
+        '<span class="match">' + escHtml(entry.matched) + '</span>' +
+        '<span class="text">' + escHtml(entry.text) + '</span>';
+      logEl.appendChild(div);
+      countEl.textContent = entries + ' entries';
+      div.scrollIntoView({ behavior: 'smooth' });
+      playBeep();
+    });
+
+    ipcRenderer.on('notify-log-clear', () => {
+      logEl.innerHTML = '<div class="empty">Waiting for matches...</div>';
+      entries = 0;
+      countEl.textContent = '0 entries';
+    });
+
+    function clearLog() {
+      ipcRenderer.send('notify-log-clear-from-window');
+      logEl.innerHTML = '<div class="empty">Waiting for matches...</div>';
+      entries = 0;
+      countEl.textContent = '0 entries';
+    }
+
+    function escHtml(s) {
+      const d = document.createElement('div');
+      d.textContent = s;
+      return d.innerHTML;
+    }
+  </script>
+</body>
+</html>`
 
 function createWindow(): void {
   // Create the browser window.
@@ -189,6 +295,52 @@ app.whenReady().then(() => {
       }
     }
   )
+
+  // --- Notify Log Window ---
+  ipcMain.handle('open-notify-log-window', async () => {
+    if (logWindow && !logWindow.isDestroyed()) {
+      logWindow.focus()
+      return true
+    }
+    logWindow = new BrowserWindow({
+      width: 520,
+      height: 400,
+      title: 'Match Log',
+      autoHideMenuBar: true,
+      webPreferences: {
+        nodeIntegration: true,
+        contextIsolation: false
+      }
+    })
+    logWindow.loadURL(`data:text/html;charset=utf-8,${encodeURIComponent(LOG_WINDOW_HTML)}`)
+    logWindow.on('closed', () => {
+      logWindow = null
+    })
+    return true
+  })
+
+  ipcMain.handle(
+    'add-notify-log-entry',
+    async (_, entry: { timestamp: string; matched: string; text: string }) => {
+      if (logWindow && !logWindow.isDestroyed()) {
+        logWindow.webContents.send('notify-log-entry', entry)
+      }
+    }
+  )
+
+  ipcMain.handle('clear-notify-log-window', async () => {
+    if (logWindow && !logWindow.isDestroyed()) {
+      logWindow.webContents.send('notify-log-clear')
+    }
+  })
+
+  ipcMain.on('notify-log-clear-from-window', () => {
+    // Forward clear request back to renderer
+    const mainWin = BrowserWindow.getAllWindows().find((w) => w !== logWindow && !w.isDestroyed())
+    if (mainWin) {
+      mainWin.webContents.send('notify-log-cleared')
+    }
+  })
 
   createWindow()
 

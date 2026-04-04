@@ -48,6 +48,48 @@ const modelStatus = ref('Ready to load')
 const loadProgress = ref(0)
 const isCopied = ref(false)
 const isSaved = ref(false)
+
+// Notification feature
+const enableNotification = ref(false)
+const notifyPattern = ref('')
+
+interface NotifyLogEntry {
+  timestamp: string
+  matched: string
+  text: string
+}
+const notifyLog = ref<NotifyLogEntry[]>([])
+let currentStreamTimestamp = '' // Tracks the timestamp of the current live capture
+
+function checkAndNotify(text: string): void {
+  if (!enableNotification.value || !notifyPattern.value) return
+  try {
+    const regex = new RegExp(notifyPattern.value)
+    const match = text.match(regex)
+    if (match) {
+      // Always log the match regardless of cooldown
+      const timestamp =
+        isStreaming.value && currentStreamTimestamp
+          ? currentStreamTimestamp
+          : new Date().toLocaleTimeString()
+      const entry = {
+        timestamp,
+        matched: match[0],
+        text: text.substring(0, 200)
+      }
+      notifyLog.value.push(entry)
+      // Forward to log window
+      window.electron.ipcRenderer.invoke('add-notify-log-entry', entry)
+    }
+  } catch {
+    // Invalid regex – silently ignore
+  }
+}
+
+function openLogWindow(): void {
+  window.electron.ipcRenderer.invoke('open-notify-log-window')
+}
+
 const isStreamingToFile = ref(false)
 const streamingFilePath = ref('')
 const isStreaming = ref(false)
@@ -245,6 +287,7 @@ function initWorker(): void {
         isLoading.value = false
         if (!isStreaming.value) {
           resultText.value = payload
+          checkAndNotify(payload)
           if (isStreamingToFile.value && streamingFilePath.value) {
             window.electron.ipcRenderer.invoke('append-to-file', {
               filePath: streamingFilePath.value,
@@ -254,6 +297,7 @@ function initWorker(): void {
         } else {
           // In streaming mode, chunks already populated resultText.
           // We just add a double newline to separate from next capture.
+          checkAndNotify(payload)
           resultText.value += '\n'
           if (isStreamingToFile.value && streamingFilePath.value) {
             window.electron.ipcRenderer.invoke('append-to-file', {
@@ -354,6 +398,10 @@ onMounted(async () => {
   if (includeAudio.value) {
     startAudioCapture()
   }
+  // Listen for clear events from the log window
+  window.electron.ipcRenderer.on('notify-log-cleared', () => {
+    notifyLog.value = []
+  })
 })
 
 async function onSourceTypeChange(): Promise<void> {
@@ -492,6 +540,7 @@ async function captureAndAnalyze(): Promise<void> {
     } else {
       timestamp = new Date().toLocaleTimeString()
     }
+    currentStreamTimestamp = timestamp
     const header = `\n[${timestamp}] `
     resultText.value += header
     if (isStreamingToFile.value && streamingFilePath.value) {
@@ -804,6 +853,26 @@ onUnmounted(() => {
           </div>
           <div v-if="streamingFilePath" class="path-display" :title="streamingFilePath">
             {{ streamingFilePath }}
+          </div>
+        </div>
+
+        <div class="notification-config">
+          <div class="config-row">
+            <label class="checkbox-label">
+              <input v-model="enableNotification" type="checkbox" />
+              Regex Notify
+            </label>
+            <button v-if="enableNotification" class="open-log-btn" @click="openLogWindow">
+              🔔 Open Log{{ notifyLog.length > 0 ? ` (${notifyLog.length})` : '' }}
+            </button>
+          </div>
+          <div v-if="enableNotification" class="config-row">
+            <input
+              v-model="notifyPattern"
+              type="text"
+              placeholder="e.g. 異常|エラー|alert"
+              class="notify-pattern-input"
+            />
           </div>
         </div>
 
@@ -1171,5 +1240,42 @@ body {
   height: 100%;
   background: #007bff;
   transition: width 0.3s ease;
+}
+.notification-config {
+  margin-top: 10px;
+  padding-top: 10px;
+  border-top: 1px solid #eee;
+}
+.notification-config .config-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 6px;
+}
+.notify-pattern-input {
+  flex: 1;
+  padding: 6px 10px;
+  border: 1px solid #ccc;
+  border-radius: 4px;
+  font-size: 13px;
+  font-family: monospace;
+}
+.notify-pattern-input:focus {
+  border-color: #007bff;
+  outline: none;
+  box-shadow: 0 0 0 2px rgba(0, 123, 255, 0.15);
+}
+.open-log-btn {
+  background: #16213e !important;
+  color: #53d8fb !important;
+  border: 1px solid #0f3460 !important;
+  padding: 4px 10px !important;
+  font-size: 12px !important;
+  cursor: pointer;
+  border-radius: 4px;
+  white-space: nowrap;
+}
+.open-log-btn:hover {
+  background: #0f3460 !important;
 }
 </style>
