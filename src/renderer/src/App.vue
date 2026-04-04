@@ -114,27 +114,40 @@ const audioStatus = ref('')
 let writeIdx = 0
 let animationFrameId: number | null = null
 
+const AUDIO_SOURCE_VIDEO = '__video_audio__'
+let videoSourceNode: MediaElementAudioSourceNode | null = null
+
 async function startAudioCapture(): Promise<void> {
   if (audioContext) {
+    // Only close if we are switching away from video or if it's not the same context
+    // Actually, it's safer to close and recreate unless it's the MediaElementSource
+    // because MediaElementSource can't be moved between contexts easily in some browsers.
+    // But for simplicity, let's keep the context if it exists and just reconnect.
     audioContext.close()
   }
   try {
-    audioStream = await navigator.mediaDevices.getUserMedia({
-      audio: selectedAudioSourceId.value
-        ? { deviceId: { exact: selectedAudioSourceId.value } }
-        : true,
-      video: false
-    })
-
-    console.log('Audio stream obtained:', {
-      active: audioStream.active,
-      tracks: audioStream.getAudioTracks().map((t) => ({ label: t.label, enabled: t.enabled }))
-    })
-
-    audioContext = new AudioContext() // Default sample rate
+    audioContext = new AudioContext()
     audioStatus.value = `Running (${audioContext.sampleRate}Hz)`
 
-    const source = audioContext.createMediaStreamSource(audioStream)
+    let source: AudioNode
+    if (selectedAudioSourceId.value === AUDIO_SOURCE_VIDEO && videoRef.value) {
+      if (!videoSourceNode || videoSourceNode.context !== audioContext) {
+        videoSourceNode = audioContext.createMediaElementSource(videoRef.value)
+      }
+      source = videoSourceNode
+      // For video, we MUST connect to destination to hear it
+      source.connect(audioContext.destination)
+    } else {
+      audioStream = await navigator.mediaDevices.getUserMedia({
+        audio: selectedAudioSourceId.value
+          ? { deviceId: { exact: selectedAudioSourceId.value } }
+          : true,
+        video: false
+      })
+      source = audioContext.createMediaStreamSource(audioStream)
+      // For mic, we DON'T connect to destination to avoid feedback
+    }
+
     const analyser = audioContext.createAnalyser()
     analyser.fftSize = 256
     const processorNode = audioContext.createScriptProcessor(4096, 1, 1)
@@ -430,6 +443,11 @@ async function onSourceTypeChange(): Promise<void> {
   } else if (sourceType.value === 'webcam' && webcamSources.value.length > 0) {
     selectedSourceId.value = webcamSources.value[0].deviceId
     startStream()
+  } else if (sourceType.value === 'video') {
+    // When switching to video, automatically suggest video audio
+    if (includeAudio.value) {
+      selectedAudioSourceId.value = AUDIO_SOURCE_VIDEO
+    }
   }
 }
 
@@ -702,6 +720,9 @@ onUnmounted(() => {
             <div class="control-group">
               <label>Audio Source</label>
               <select v-model="selectedAudioSourceId">
+                <option v-if="sourceType === 'video'" :value="AUDIO_SOURCE_VIDEO">
+                  Video Audio (Internal)
+                </option>
                 <option v-for="a in audioSources" :key="a.deviceId" :value="a.deviceId">
                   {{ a.label || `Audio ${a.deviceId}` }}
                 </option>
@@ -810,7 +831,12 @@ onUnmounted(() => {
     <div class="main-content">
       <div class="video-container">
         <!-- eslint-disable-next-line vue/html-self-closing -->
-        <video ref="videoRef" :controls="sourceType === 'video'" playsinline></video>
+        <video
+          ref="videoRef"
+          :controls="sourceType === 'video'"
+          crossorigin="anonymous"
+          playsinline
+        ></video>
 
         <!-- Selection Box Overlay (hidden in video file mode) -->
         <div

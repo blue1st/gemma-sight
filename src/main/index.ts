@@ -206,7 +206,8 @@ app.whenReady().then(() => {
           'Content-Type': contentType,
           'Content-Range': `bytes ${start}-${end}/${stat.size}`,
           'Content-Length': chunkSize.toString(),
-          'Accept-Ranges': 'bytes'
+          'Accept-Ranges': 'bytes',
+          'Access-Control-Allow-Origin': '*'
         }
       })
     }
@@ -218,7 +219,8 @@ app.whenReady().then(() => {
       headers: {
         'Content-Type': contentType,
         'Content-Length': stat.size.toString(),
-        'Accept-Ranges': 'bytes'
+        'Accept-Ranges': 'bytes',
+        'Access-Control-Allow-Origin': '*'
       }
     })
   })
