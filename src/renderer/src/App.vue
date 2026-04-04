@@ -22,7 +22,13 @@ const dragStart = ref({ x: 0, y: 0 })
 const initialBox = ref({ x: 0, y: 0, width: 0, height: 0 })
 
 const modelId = ref('onnx-community/gemma-4-E2B-it-ONNX')
-const promptText = ref('Describe this image in Japanese.')
+const DEFAULT_PROMPT = 'Describe this image in Japanese.'
+const promptText = ref(DEFAULT_PROMPT)
+
+function resetPrompt(): void {
+  promptText.value = DEFAULT_PROMPT
+}
+
 const resultText = ref('')
 const isLoading = ref(false)
 const modelStatus = ref('Ready to load')
@@ -295,59 +301,70 @@ onUnmounted(() => {
 <template>
   <div class="app-container">
     <header class="header">
-      <h1>Screen Vision Analyzer</h1>
-      <div class="controls">
-        <div class="control-group">
-          <label>Source Type</label>
-          <select v-model="sourceType" @change="onSourceTypeChange">
-            <option value="screen">Screen / Window</option>
-            <option value="webcam">WebCam</option>
-          </select>
+      <div class="controls-container">
+        <div class="control-row">
+          <div class="control-group">
+            <label>Source Type</label>
+            <select v-model="sourceType" @change="onSourceTypeChange">
+              <option value="screen">Screen / Window</option>
+              <option value="webcam">WebCam</option>
+            </select>
+          </div>
+
+          <div class="control-group">
+            <label>Source</label>
+            <select v-model="selectedSourceId" @change="startStream">
+              <template v-if="sourceType === 'screen'">
+                <option v-for="s in screenSources" :key="s.id" :value="s.id">
+                  {{ s.name }}
+                </option>
+              </template>
+              <template v-else>
+                <option v-for="w in webcamSources" :key="w.deviceId" :value="w.deviceId">
+                  {{ w.label || `Camera ${w.deviceId}` }}
+                </option>
+              </template>
+            </select>
+            <button class="refresh-btn" @click="fetchSources">🔄</button>
+          </div>
+
+          <div class="control-group">
+            <label>Model</label>
+            <input
+              v-model="modelId"
+              placeholder="e.g. google/gemma-4-E2B-it"
+              style="width: 200px"
+              readonly
+            />
+          </div>
+
+          <button :disabled="isLoading" @click="loadModel">Load Model</button>
         </div>
 
-        <div class="control-group">
-          <label>Source</label>
-          <select v-model="selectedSourceId" @change="startStream">
-            <template v-if="sourceType === 'screen'">
-              <option v-for="s in screenSources" :key="s.id" :value="s.id">
-                {{ s.name }}
-              </option>
-            </template>
-            <template v-else>
-              <option v-for="w in webcamSources" :key="w.deviceId" :value="w.deviceId">
-                {{ w.label || `Camera ${w.deviceId}` }}
-              </option>
-            </template>
-          </select>
-          <button class="refresh-btn" @click="fetchSources">🔄</button>
-        </div>
+        <div class="control-row">
+          <div class="control-group prompt-group">
+            <label>Prompt</label>
+            <textarea
+              v-model="promptText"
+              placeholder="Prompt..."
+              class="prompt-textarea"
+            ></textarea>
+            <button class="reset-btn" title="Restore default prompt" @click="resetPrompt">⎌</button>
+          </div>
 
-        <div class="control-group">
-          <label>Model</label>
-          <input
-            v-model="modelId"
-            placeholder="e.g. google/gemma-4-E2B-it"
-            style="width: 200px"
-            readonly
-          />
+          <div class="action-buttons">
+            <button :disabled="!isModelLoaded || isLoading" @click="captureAndAnalyze">
+              Capture & Analyze
+            </button>
+            <button
+              :disabled="!isModelLoaded"
+              :style="isModelLoaded ? { background: isStreaming ? '#ff4757' : '#2ed573' } : {}"
+              @click="toggleStreaming"
+            >
+              {{ isStreaming ? 'Stop Live' : 'Start Live Analysis' }}
+            </button>
+          </div>
         </div>
-
-        <div class="control-group">
-          <label>Prompt</label>
-          <input v-model="promptText" placeholder="Prompt..." style="width: 200px" />
-        </div>
-
-        <button :disabled="isLoading" @click="loadModel">Load Model</button>
-        <button :disabled="!isModelLoaded || isLoading" @click="captureAndAnalyze">
-          Capture & Analyze
-        </button>
-        <button
-          :disabled="!isModelLoaded"
-          :style="isModelLoaded ? { background: isStreaming ? '#ff4757' : '#2ed573' } : {}"
-          @click="toggleStreaming"
-        >
-          {{ isStreaming ? 'Stop Live' : 'Start Live Analysis' }}
-        </button>
       </div>
       <div class="status">
         {{ modelStatus }}
@@ -381,11 +398,7 @@ onUnmounted(() => {
         <div class="sidebar-header">
           <h3>Analysis Result</h3>
           <div class="sidebar-actions">
-            <button
-              class="clear-btn"
-              :disabled="!resultText || isLoading"
-              @click="clearResult"
-            >
+            <button class="clear-btn" :disabled="!resultText || isLoading" @click="clearResult">
               Clear
             </button>
             <button class="copy-btn" :disabled="!resultText || isLoading" @click="copyToClipboard">
@@ -430,15 +443,30 @@ body {
   margin: 0 0 10px 0;
   font-size: 20px;
 }
-.controls {
+.controls-container {
   display: flex;
-  gap: 10px;
+  flex-direction: column;
+  gap: 12px;
+}
+.control-row {
+  display: flex;
+  gap: 15px;
   align-items: center;
   flex-wrap: wrap;
 }
-.controls select,
-.controls input,
-.controls button {
+.control-row:last-child {
+  align-items: flex-start;
+}
+.action-buttons {
+  display: flex;
+  gap: 10px;
+  align-self: flex-start;
+  padding-top: 0;
+}
+.controls-container select,
+.controls-container input,
+.controls-container button,
+.controls-container textarea {
   padding: 8px 12px;
   border: 1px solid #ccc;
   border-radius: 6px;
@@ -455,13 +483,44 @@ body {
   color: #555;
   white-space: nowrap;
 }
+.prompt-group {
+  flex: 1;
+  min-width: 300px;
+  align-items: flex-start !important;
+}
+.prompt-textarea {
+  flex: 1;
+  min-height: 42px;
+  max-height: 150px;
+  resize: vertical;
+  padding: 8px 12px;
+  border: 1px solid #ccc;
+  border-radius: 6px;
+  font-size: 14px;
+  font-family: inherit;
+  line-height: 1.4;
+}
+.reset-btn {
+  padding: 4px 10px !important;
+  background: #f8f9fa !important;
+  color: #333 !important;
+  border: 1px solid #ccc !important;
+  font-size: 16px !important;
+  height: 42px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.reset-btn:hover {
+  background: #e9ecef !important;
+}
 .refresh-btn {
   padding: 4px 8px !important;
   background: #f8f9fa !important;
   color: #333 !important;
   border: 1px solid #ccc !important;
 }
-.controls button {
+.controls-container button {
   background: #007bff;
   color: white;
   border: none;
@@ -470,13 +529,13 @@ body {
     background 0.2s,
     transform 0.1s;
 }
-.controls button:active {
+.controls-container button:active {
   transform: translateY(1px);
 }
-.controls button:hover:not(:disabled) {
+.controls-container button:hover:not(:disabled) {
   background: #0056b3;
 }
-.controls button:disabled {
+.controls-container button:disabled {
   background: #aaa;
   cursor: not-allowed;
 }

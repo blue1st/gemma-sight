@@ -58263,9 +58263,7 @@ var DZ = (0, y.createContext)(!1),
   },
   EQ = /startLine=(\d+)/,
   DQ = /\bnoLineNumbers\b/,
-  OQ = (0, y.lazy)(() =>
-    w(() => import(`./mermaid.js`).then((e) => ({ default: e.Mermaid })), [])
-  ),
+  OQ = (0, y.lazy)(() => w(() => import(`./mermaid.js`).then((e) => ({ default: e.Mermaid })), [])),
   kQ = /language-([^\s]+)/
 function AQ(e, t) {
   if (!((e != null && e.position) || (t != null && t.position))) return !0
