@@ -25,7 +25,18 @@ const isResizing = ref(false)
 const dragStart = ref({ x: 0, y: 0 })
 const initialBox = ref({ x: 0, y: 0, width: 0, height: 0 })
 
-const modelId = ref('onnx-community/gemma-4-E2B-it-ONNX')
+const modelOptions = [
+  { id: 'onnx-community/gemma-4-E2B-it-ONNX', name: 'Gemma 4 E2B (Rapid / Lite)' },
+  { id: 'onnx-community/gemma-4-E4B-it-ONNX', name: 'Gemma 4 E4B (Smart / Precise)' }
+]
+const modelId = ref(modelOptions[0].id)
+
+watch(modelId, () => {
+  isModelLoaded.value = false
+  modelStatus.value = 'Model changed. Please load the new model.'
+  loadProgress.value = 0
+})
+
 const DEFAULT_PROMPT = 'Describe this image in Japanese. 1-2 sentences.'
 const DEFAULT_MULTIMODAL_PROMPT = 'Describe this image and audio in Japanese. 1-2 sentences.'
 const promptText = ref(DEFAULT_PROMPT)
@@ -720,12 +731,11 @@ onUnmounted(() => {
           <div class="control-row-left">
             <div class="control-group">
               <label>Model</label>
-              <input
-                v-model="modelId"
-                placeholder="e.g. google/gemma-4-E2B-it"
-                class="model-input"
-                readonly
-              />
+              <select v-model="modelId" class="model-select" :disabled="isLoading">
+                <option v-for="m in modelOptions" :key="m.id" :value="m.id">
+                  {{ m.name }}
+                </option>
+              </select>
             </div>
           </div>
           <div class="control-row-right">
@@ -954,7 +964,7 @@ body {
   min-width: 150px;
   max-width: 300px;
 }
-.model-input {
+.model-select {
   width: 280px;
 }
 .prompt-group {
