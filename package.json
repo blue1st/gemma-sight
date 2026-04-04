@@ -4,7 +4,7 @@
   "description": "Real-time AI screen description app powered by Gemma 4 and Transformers.js",
   "repository": {
     "type": "git",
-    "url": "https://github.com/t-kawasaki/gemma-sight.git"
+    "url": "https://github.com/blue1st/gemma-sight.git"
   },
   "main": "./out/main/index.js",
   "author": "example.com",
