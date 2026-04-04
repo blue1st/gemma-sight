@@ -26,10 +26,15 @@ const DEFAULT_PROMPT = 'Describe this image in Japanese.'
 const promptText = ref(DEFAULT_PROMPT)
 
 // Sampling Interval (ms)
-const samplingInterval = ref(2000)
+const DEFAULT_INTERVAL = 2000
+const samplingInterval = ref(DEFAULT_INTERVAL)
 
 function resetPrompt(): void {
   promptText.value = DEFAULT_PROMPT
+}
+
+function resetInterval(): void {
+  samplingInterval.value = DEFAULT_INTERVAL
 }
 
 const resultText = ref('')
@@ -431,6 +436,9 @@ onUnmounted(() => {
               min="0"
               style="width: 100px"
             />
+            <button class="reset-btn" title="Restore default interval" @click="resetInterval">
+              ⎌
+            </button>
           </div>
 
           <button
@@ -669,14 +677,8 @@ body {
 .load-btn:hover:not(:disabled) {
   background: #0097e6 !important;
 }
-.capture-btn {
-  /* Dynamic styling in template */
-}
 .capture-btn:hover:not(:disabled) {
   background: #2d5a9e !important;
-}
-.live-btn {
-/* Dynamic styling in template */
 }
 .status {
   margin-top: 10px;
