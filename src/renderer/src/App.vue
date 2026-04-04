@@ -26,8 +26,8 @@ const dragStart = ref({ x: 0, y: 0 })
 const initialBox = ref({ x: 0, y: 0, width: 0, height: 0 })
 
 const modelId = ref('onnx-community/gemma-4-E2B-it-ONNX')
-const DEFAULT_PROMPT = 'Describe this image in Japanese.'
-const DEFAULT_MULTIMODAL_PROMPT = 'Describe this image and audio in Japanese.'
+const DEFAULT_PROMPT = 'Describe this image in Japanese. 1-2 sentences.'
+const DEFAULT_MULTIMODAL_PROMPT = 'Describe this image and audio in Japanese. 1-2 sentences.'
 const promptText = ref(DEFAULT_PROMPT)
 
 // Sampling Interval (ms)
@@ -473,7 +473,25 @@ async function captureAndAnalyze(): Promise<void> {
 
   isLoading.value = true
   if (isStreaming.value) {
-    const timestamp = new Date().toLocaleTimeString()
+    let timestamp: string
+    if (sourceType.value === 'video' && video) {
+      const t = video.currentTime
+      const h = Math.floor(t / 3600)
+        .toString()
+        .padStart(2, '0')
+      const m = Math.floor((t % 3600) / 60)
+        .toString()
+        .padStart(2, '0')
+      const s = Math.floor(t % 60)
+        .toString()
+        .padStart(2, '0')
+      const ms = Math.floor((t % 1) * 1000)
+        .toString()
+        .padStart(3, '0')
+      timestamp = `${h}:${m}:${s}.${ms}`
+    } else {
+      timestamp = new Date().toLocaleTimeString()
+    }
     const header = `\n[${timestamp}] `
     resultText.value += header
     if (isStreamingToFile.value && streamingFilePath.value) {
