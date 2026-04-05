@@ -1,6 +1,6 @@
 {
   "name": "gemmasight",
-  "version": "1.4.0",
+  "version": "1.4.1",
   "description": "Real-time AI screen description app powered by Gemma 4 and Transformers.js",
   "repository": {
     "type": "git",
