@@ -306,12 +306,42 @@
         style="background: rgba(255, 255, 255, 0.01); border-bottom: 1px solid var(--glass-border)"
       >
         <h2>ライブ解析の仕組み</h2>
-        <p style="text-align: center; color: #a4b0be; max-width: 800px; margin: 0 auto 2rem">
-          <strong>Capture Interval</strong>（撮影周期）でフレームをバッファに貯め、
-          <strong>Analysis Frames</strong>（解析フレーム数）だけ揃った状態でAIが解析を実行します。
-          次の解析までは <strong>Live Interval</strong>（解析待機）分だけ待機します。
+        <p style="text-align: center; color: #a4b0be; max-width: 800px; margin: 0 auto 3rem">
+          GemmaSightには、静止画として1枚ずつ解析する「通常モード」と、複数のフレームをまとめて解析する「ビデオモード」があります。
+          いずれのモードでも、解析が完了した後に <strong>Live Interval</strong> 分の待機時間を挟んで次の解析サイクルが始まります。
         </p>
 
+        <!-- Image Mode -->
+        <h3 style="text-align: center; margin-bottom: 1.5rem; color: var(--primary-color)">
+          通常モード（単一画像解析）
+        </h3>
+        <p style="text-align: center; color: #a4b0be; font-size: 0.9rem; margin-bottom: 2rem">
+          設定された間隔ごとに、その瞬間の画面を1枚だけキャプチャして解析します。
+        </p>
+        <div
+          class="canvas-container"
+          style="
+            background: #0a0f1d;
+            border-radius: 20px;
+            border: 1px solid var(--glass-border);
+            padding: 2rem;
+            max-width: 900px;
+            margin: 0 auto 4rem;
+            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.5);
+            overflow: hidden;
+          "
+        >
+          <canvas id="mechanismCanvasImage" style="width: 100%; height: 300px"></canvas>
+        </div>
+
+        <!-- Video Mode -->
+        <h3 style="text-align: center; margin-bottom: 1.5rem; color: var(--accent-color)">
+          ビデオモード（複数フレーム解析）
+        </h3>
+        <p style="text-align: center; color: #a4b0be; font-size: 0.9rem; margin-bottom: 2rem">
+          一定の周期（Capture Interval）でフレームを蓄積し、指定枚数（Analysis
+          Frames）が揃った段階でまとめて解析します。
+        </p>
         <div
           class="canvas-container"
           style="
@@ -325,13 +355,10 @@
             overflow: hidden;
           "
         >
-          <canvas id="mechanismCanvas" style="width: 100%; height: 350px"></canvas>
+          <canvas id="mechanismCanvasVideo" style="width: 100%; height: 350px"></canvas>
         </div>
 
         <script>
-          const canvas = document.getElementById('mechanismCanvas')
-          const ctx = canvas.getContext('2d')
-
           const colors = {
             primary: '#3867d6',
             secondary: '#8854d0',
@@ -341,187 +368,204 @@
             dim: '#a4b0be'
           }
 
-          // Simulation Constants
-          const CAPTURE_INTERVAL_DIST = 60
-          const BATCH_SIZE = 4
-          const LIVE_INTERVAL_DIST = 220
-          const SPEED = 1.6
+          function setupCanvas(canvasId, isVideoMode) {
+            const canvas = document.getElementById(canvasId)
+            const ctx = canvas.getContext('2d')
 
-          // State
-          let playbackX = 0
-          let captures = [] // {x, y, batch, analyzing}
-          let state = 'CAPTURING'
-          let capturesInBatch = 0
-          let nextCaptureX = 0
-          let analysisFlash = 0
+            // Simulation Constants
+            const CAPTURE_INTERVAL_DIST = 60
+            const BATCH_SIZE = isVideoMode ? 4 : 1
+            const LIVE_INTERVAL_DIST = isVideoMode ? 220 : 300
+            const SPEED = 1.6
 
-          function draw() {
-            const dpr = window.devicePixelRatio || 1
-            const rect = canvas.getBoundingClientRect()
-            if (canvas.width !== rect.width * dpr || canvas.height !== rect.height * dpr) {
-              canvas.width = rect.width * dpr
-              canvas.height = rect.height * dpr
-            }
-            ctx.scale(dpr, dpr)
-            const w = rect.width
-            const h = rect.height
-            ctx.clearRect(0, 0, w, h)
+            let playbackX = 0
+            let captures = []
+            let state = 'CAPTURING'
+            let capturesInBatch = 0
+            let nextCaptureX = 0
+            let analysisFlash = 0
 
-            const margin = 80
-            const trackY = h / 2 + 10
-            const trackWidth = w - margin * 2
+            function draw() {
+              const dpr = window.devicePixelRatio || 1
+              const rect = canvas.getBoundingClientRect()
+              if (canvas.width !== rect.width * dpr || canvas.height !== rect.height * dpr) {
+                canvas.width = rect.width * dpr
+                canvas.height = rect.height * dpr
+              }
+              ctx.save()
+              ctx.scale(dpr, dpr)
+              const w = rect.width
+              const h = rect.height
+              ctx.clearRect(0, 0, w, h)
 
-            // ---- Background UI ----
-            ctx.fillStyle = colors.dim
-            ctx.font = 'bold 14px Inter'
-            ctx.fillText('Live Analysis Stream', margin, trackY - 120)
+              const margin = 80
+              const trackY = isVideoMode ? h / 2 + 10 : h / 2 + 30
+              const trackWidth = w - margin * 2
 
-            // ---- Update Logic ----
-            playbackX += SPEED
-            if (playbackX > trackWidth) {
-              playbackX = 0
-              captures = []
-              capturesInBatch = 0
-              nextCaptureX = 0
-              state = 'CAPTURING'
-            }
-
-            if (state === 'CAPTURING' && playbackX >= nextCaptureX) {
-              captures.push({
-                x: margin + playbackX,
-                y: trackY,
-                batch: Math.floor(captures.length / BATCH_SIZE),
-                analyzing: false
-              })
-              capturesInBatch++
-              nextCaptureX = playbackX + CAPTURE_INTERVAL_DIST
-
-              if (capturesInBatch === BATCH_SIZE) {
-                state = 'WAITING'
-                nextCaptureX = playbackX + LIVE_INTERVAL_DIST
+              // ---- Update Logic ----
+              playbackX += SPEED
+              if (playbackX > trackWidth) {
+                playbackX = 0
+                captures = []
                 capturesInBatch = 0
-                analysisFlash = 80 
-                
-                const currentBatch = captures.slice(-BATCH_SIZE)
-                currentBatch.forEach(c => c.analyzing = true)
+                nextCaptureX = 0
+                state = 'CAPTURING'
               }
-            } else if (state === 'WAITING' && playbackX >= nextCaptureX) {
-              state = 'CAPTURING'
-              nextCaptureX = playbackX + 5
-            }
 
-            if (analysisFlash > 0) analysisFlash--
+              if (state === 'CAPTURING' && playbackX >= nextCaptureX) {
+                captures.push({
+                  x: margin + playbackX,
+                  y: trackY,
+                  batch: Math.floor(captures.length / BATCH_SIZE),
+                  analyzing: false
+                })
+                capturesInBatch++
+                nextCaptureX = playbackX + CAPTURE_INTERVAL_DIST
 
-            // ---- Draw Track ----
-            ctx.strokeStyle = 'rgba(255,255,255,0.05)'
-            ctx.lineWidth = 4
-            ctx.beginPath()
-            ctx.moveTo(margin, trackY)
-            ctx.lineTo(margin + trackWidth, trackY)
-            ctx.stroke()
+                if (capturesInBatch === BATCH_SIZE) {
+                  state = 'WAITING'
+                  nextCaptureX = playbackX + LIVE_INTERVAL_DIST
+                  capturesInBatch = 0
+                  analysisFlash = 80
 
-            // ---- Draw Captures & Brackets ----
-            const batchGroups = {}
-            captures.forEach(c => {
-               if (!batchGroups[c.batch]) batchGroups[c.batch] = []
-               batchGroups[c.batch].push(c)
-            })
+                  const currentBatch = captures.slice(-BATCH_SIZE)
+                  currentBatch.forEach((c) => (c.analyzing = true))
+                }
+              } else if (state === 'WAITING' && playbackX >= nextCaptureX) {
+                state = 'CAPTURING'
+                nextCaptureX = playbackX + 5
+              }
 
-            Object.keys(batchGroups).forEach(batchId => {
-              const group = batchGroups[batchId]
-              const isAnalyzing = group[0].analyzing && analysisFlash > 0
-              
-              group.forEach(c => {
-                // Tick
-                ctx.strokeStyle = isAnalyzing ? colors.accent : colors.dim
-                ctx.lineWidth = 2
-                ctx.beginPath()
-                ctx.moveTo(c.x, trackY - 10)
-                ctx.lineTo(c.x, trackY + 10)
-                ctx.stroke()
+              if (analysisFlash > 0) analysisFlash--
 
-                // Camera
-                ctx.font = '22px serif'
-                ctx.fillText('📷', c.x - 11, trackY - 20)
+              // ---- Draw Track ----
+              ctx.strokeStyle = 'rgba(255,255,255,0.05)'
+              ctx.lineWidth = 4
+              ctx.beginPath()
+              ctx.moveTo(margin, trackY)
+              ctx.lineTo(margin + trackWidth, trackY)
+              ctx.stroke()
+
+              // ---- Draw Captures & Brackets ----
+              const batchGroups = {}
+              captures.forEach((c) => {
+                if (!batchGroups[c.batch]) batchGroups[c.batch] = []
+                batchGroups[c.batch].push(c)
               })
 
-              // Horizontal Bracket for completed batch
-              if (group.length === BATCH_SIZE) {
-                const startX = group[0].x - 15
-                const endX = group[BATCH_SIZE-1].x + 15
-                const bracketY = trackY - 55
+              Object.keys(batchGroups).forEach((batchId) => {
+                const group = batchGroups[batchId]
+                const isAnalyzing = group[0].analyzing && analysisFlash > 0
 
-                ctx.strokeStyle = isAnalyzing ? colors.accent : 'rgba(255,255,255,0.2)'
-                ctx.lineWidth = 1
-                ctx.beginPath()
-                ctx.moveTo(startX, bracketY + 5)
-                ctx.lineTo(startX, bracketY)
-                ctx.lineTo(endX, bracketY)
-                ctx.lineTo(endX, bracketY + 5)
-                ctx.stroke()
+                group.forEach((c) => {
+                  ctx.strokeStyle = isAnalyzing ? colors.accent : colors.dim
+                  ctx.lineWidth = 2
+                  ctx.beginPath()
+                  ctx.moveTo(c.x, trackY - 10)
+                  ctx.lineTo(c.x, trackY + 10)
+                  ctx.stroke()
 
-                ctx.fillStyle = isAnalyzing ? colors.accent : colors.dim
-                ctx.font = isAnalyzing ? 'bold 10px Inter' : '10px Inter'
-                ctx.textAlign = 'center'
-                ctx.fillText(`Analysis Frames (${BATCH_SIZE} items)`, (startX + endX) / 2, bracketY - 10)
-                ctx.textAlign = 'left'
-              }
-            })
+                  ctx.font = '22px serif'
+                  ctx.fillText('📷', c.x - 11, trackY - 20)
+                })
 
-            // ---- Playhead ----
-            ctx.fillStyle = colors.primary
-            ctx.beginPath()
-            ctx.moveTo(margin + playbackX, trackY - 8)
-            ctx.lineTo(margin + playbackX + 12, trackY)
-            ctx.lineTo(margin + playbackX, trackY + 8)
-            ctx.fill()
-            
-            ctx.strokeStyle = colors.primary
-            ctx.lineWidth = 1
-            ctx.setLineDash([2, 4])
-            ctx.beginPath()
-            ctx.moveTo(margin + playbackX, trackY - 100)
-            ctx.lineTo(margin + playbackX, trackY + 80)
-            ctx.stroke()
-            ctx.setLineDash([])
+                // Brackets only if batch > 1
+                if (group.length === BATCH_SIZE && BATCH_SIZE > 1) {
+                  const startX = group[0].x - 15
+                  const endX = group[BATCH_SIZE - 1].x + 15
+                  const bracketY = trackY - 55
 
-            // ---- Status Text ----
-            if (state === 'WAITING') {
+                  ctx.strokeStyle = isAnalyzing ? colors.accent : 'rgba(255,255,255,0.2)'
+                  ctx.lineWidth = 1
+                  ctx.beginPath()
+                  ctx.moveTo(startX, bracketY + 5)
+                  ctx.lineTo(startX, bracketY)
+                  ctx.lineTo(endX, bracketY)
+                  ctx.lineTo(endX, bracketY + 5)
+                  ctx.stroke()
+
+                  ctx.fillStyle = isAnalyzing ? colors.accent : colors.dim
+                  ctx.font = isAnalyzing ? 'bold 10px Inter' : '10px Inter'
+                  ctx.textAlign = 'center'
+                  ctx.fillText(
+                    `Analysis Frames (${BATCH_SIZE} items)`,
+                    (startX + endX) / 2,
+                    bracketY - 10
+                  )
+                  ctx.textAlign = 'left'
+                } else if (group.length === BATCH_SIZE && BATCH_SIZE === 1) {
+                  // Label for single capture
+                  if (isAnalyzing) {
+                    ctx.fillStyle = colors.accent
+                    ctx.font = 'bold 10px Inter'
+                    ctx.fillText('Analyzing Screen...', group[0].x - 40, trackY - 45)
+                  }
+                }
+              })
+
+              // ---- Playhead ----
+              ctx.fillStyle = isVideoMode ? colors.accent : colors.primary
+              ctx.beginPath()
+              ctx.moveTo(margin + playbackX, trackY - 8)
+              ctx.lineTo(margin + playbackX + 12, trackY)
+              ctx.lineTo(margin + playbackX, trackY + 8)
+              ctx.fill()
+
+              ctx.strokeStyle = isVideoMode ? colors.accent : colors.primary
+              ctx.lineWidth = 1
+              ctx.setLineDash([2, 4])
+              ctx.beginPath()
+              ctx.moveTo(margin + playbackX, trackY - 100)
+              ctx.lineTo(margin + playbackX, trackY + 80)
+              ctx.stroke()
+              ctx.setLineDash([])
+
+              // ---- Status Text ----
+              if (state === 'WAITING') {
                 ctx.fillStyle = colors.secondary
                 ctx.font = 'bold 13px Inter'
                 ctx.fillText('LIVE INTERVAL (PAUSE CAPTURE)', margin + playbackX + 15, trackY - 110)
-                
+
                 ctx.fillStyle = colors.dim
                 ctx.font = '10px Inter'
-                ctx.fillText('Stream continues, waiting for next cycle...', margin + playbackX + 15, trackY - 95)
-            } else if (analysisFlash > 40) {
-                ctx.fillStyle = colors.accent
-                ctx.font = 'bold 14px Inter'
-                ctx.fillText('BATCH READY - ANALYZING...', margin, trackY + 110)
+                ctx.fillText(
+                  'Stream continues, waiting for next cycle...',
+                  margin + playbackX + 15,
+                  trackY - 95
+                )
+              }
+
+              // Legend
+              const legendY = h - 30
+              const legendX1 = margin
+              const legendX2 = margin + 250
+
+              ctx.fillStyle = colors.dim
+              ctx.font = '11px Inter'
+              ctx.fillText(isVideoMode ? 'Capture Interval' : 'Single Capture', legendX1, legendY)
+              ctx.strokeStyle = colors.dim
+              ctx.strokeRect(legendX1 - 20, legendY - 8, 15, 1)
+
+              ctx.fillText('Live Interval (Waiting Space)', legendX2, legendY)
+              ctx.strokeStyle = colors.secondary
+              ctx.setLineDash([2, 2])
+              ctx.beginPath()
+              ctx.moveTo(legendX2 - 40, legendY - 4)
+              ctx.lineTo(legendX2 - 10, legendY - 4)
+              ctx.stroke()
+              ctx.setLineDash([])
+
+              ctx.restore()
+              requestAnimationFrame(draw)
             }
 
-            // Legend (Adjusted positions)
-            const legendY = h - 30
-            const legendX1 = margin
-            const legendX2 = margin + 250
-
-            ctx.fillStyle = colors.dim
-            ctx.font = '11px Inter'
-            ctx.fillText('Capture Interval', legendX1, legendY)
-            ctx.strokeStyle = colors.dim
-            ctx.strokeRect(legendX1 - 20, legendY - 8, 15, 1)
-
-            ctx.fillText('Live Interval (Waiting Space)', legendX2, legendY)
-            ctx.strokeStyle = colors.secondary
-            ctx.setLineDash([2, 2])
-            ctx.beginPath(); ctx.moveTo(legendX2 - 40, legendY - 4); ctx.lineTo(legendX2 - 10, legendY - 4); ctx.stroke()
-            ctx.setLineDash([])
-
-            requestAnimationFrame(draw)
+            draw()
           }
 
-          draw()
+          setupCanvas('mechanismCanvasImage', false)
+          setupCanvas('mechanismCanvasVideo', true)
         </script>
+      </section>
       </section>
 
       <!-- Operation Methods -->
