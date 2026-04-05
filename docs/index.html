@@ -27,8 +27,8 @@
     <section class="hero" style="height: auto; padding-bottom: 50px;">
       <div class="hero-content">
         <h1>GemmaSight Documentation</h1>
-        <p>Gemma 4 & Transformers.js を活用した、次世代の画面・音声統合解析ツールのマニュアルです。</p>
-        <img src="images/hero.png" alt="GemmaSight Hero" class="hero-image">
+        <p>Gemma 4 & Transformers.js を活用した、<strong>完全ローカル実行</strong>の次世代 画面・音声統合解析ツールのマニュアルです。</p>
+        <img src="images/startup.png" alt="GemmaSight Startup" class="hero-image">
       </div>
     </section>
 
@@ -38,7 +38,11 @@
       <p style="text-align: center; color: #a4b0be; max-width: 700px; margin: 0 auto 3rem;">
         GemmaSightは、単なる解析ツールではありません。画面上の視覚情報と音声を組み合わせることで、工夫次第で活用の幅は無限に広がります。
       </p>
-      <div class="grid">
+        <div class="card" style="border-color: var(--accent-color); background: rgba(46, 213, 115, 0.05);">
+          <div style="font-size: 2rem; margin-bottom: 1rem;">🔒</div>
+          <h3>完全ローカル・プライバシー重視</h3>
+          <p>すべての解析はデバイス上のWebGPUを利用して行われます。画像や音声データが外部サーバーに送信されることはありません（※モデルの初回ロード時のみインターネット接続が必要です。一度ロードされた後は完全にオフラインで動作します）。</p>
+        </div>
         <div class="card">
           <div style="font-size: 2rem; margin-bottom: 1rem;">📑</div>
           <h3>作業記録の自動化</h3>
@@ -165,7 +169,8 @@
       <div class="step">
         <div class="step-content">
           <h3>2. モデルのロード</h3>
-          <p>初回起動時やモデル変更時は「Load Model」をクリックしてください。WebGPUを利用したモデルがブラウザ（Electron）のキャッシュにダウンロードされます。</p>
+          <p>初回起動時やモデル変更時は「Load Model」をクリックしてください。WebGPU対応のモデルがHugging Faceよりダウンロードされ、ブラウザ（Electron）のキャッシュに保存されます。</p>
+          <p style="font-size: 0.9rem; color: #a4b0be;">※ダウンロード完了後は、インターネットに接続されていない環境（オフライン）でも解析を行うことが可能です。</p>
         </div>
       </div>
 
