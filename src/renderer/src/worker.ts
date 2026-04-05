@@ -39,8 +39,10 @@ self.onmessage = async (e: MessageEvent) => {
       if (!processor || !model) {
         throw new Error('Model or processor not loaded')
       }
-      const { promptText, dataUrl, audioData, samplingRate } = payload
-      const rawImage = await RawImage.fromURL(dataUrl)
+      const { promptText, dataUrls, audioData, samplingRate } = payload
+      const images = await Promise.all(
+        dataUrls.map((url: string) => RawImage.fromURL(url))
+      )
 
       if (audioData) {
         const sum = audioData.reduce((acc: number, val: number) => acc + Math.abs(val), 0)
@@ -51,12 +53,14 @@ self.onmessage = async (e: MessageEvent) => {
         })
       }
 
+      // Construct a content list with a placeholder for each image
+      const imagePlaceholders = images.map(() => ({ type: 'image' }))
       const messages = [
         {
           role: 'user',
           content: [
-            { type: 'image' },
-            ...(audioData ? [{ type: 'audio' }] : []), // Template doesn't need data
+            ...imagePlaceholders,
+            ...(audioData ? [{ type: 'audio' }] : []),
             { type: 'text', text: promptText }
           ]
         }
@@ -73,7 +77,9 @@ self.onmessage = async (e: MessageEvent) => {
       if (audioData && !prompt.includes('<audio>') && !prompt.includes('<boa>')) {
         console.warn('Audio marker missing in generated prompt, adding manually.')
         if (prompt.includes('<image>')) {
-          prompt = prompt.replace('<image>', '<image><audio>')
+          // If multiple images are present, find the last one to attach audio
+          // This is a naive attempt; Gemma 4 usually handles this in the template.
+          prompt = prompt.replace(/<image>\s*$/, '<image><audio>')
         } else if (prompt.includes('<boi>')) {
           prompt = prompt.replace('<eoi>', '<eoi><audio>')
         } else {
@@ -81,7 +87,7 @@ self.onmessage = async (e: MessageEvent) => {
         }
       }
 
-      const inputs = await processor(prompt, rawImage, audioData, {
+      const inputs = await processor(prompt, images, audioData, {
         add_special_tokens: false,
         sampling_rate: samplingRate
       })

@@ -38,19 +38,26 @@ watch(modelId, () => {
 })
 
 const DEFAULT_PROMPT = 'Describe this image in Japanese. 1-2 sentences.'
-const DEFAULT_MULTIMODAL_PROMPT = 'Describe this image and audio in Japanese. 1-2 sentences.'
+const DEFAULT_MULTIMODAL_PROMPT = 'Describe this image and audio in Japanese 1-2 sentences.'
+const DEFAULT_VIDEO_PROMPT = 'Describe this video in Japanese 1-2 sentences.'
+const DEFAULT_MULTIMODAL_VIDEO_PROMPT = 'Describe this video and audio in Japanese 1-2 sentences.'
 const promptText = ref(DEFAULT_PROMPT)
 
 // Sampling Interval (ms)
 const DEFAULT_INTERVAL = 2000
+const DEFAULT_VIDEO_LIVE_INTERVAL = 4000
 const samplingInterval = ref(DEFAULT_INTERVAL)
 
 function resetPrompt(): void {
-  promptText.value = DEFAULT_PROMPT
+  if (useVideoInput.value) {
+    promptText.value = includeAudio.value ? DEFAULT_MULTIMODAL_VIDEO_PROMPT : DEFAULT_VIDEO_PROMPT
+  } else {
+    promptText.value = includeAudio.value ? DEFAULT_MULTIMODAL_PROMPT : DEFAULT_PROMPT
+  }
 }
 
 function resetInterval(): void {
-  samplingInterval.value = DEFAULT_INTERVAL
+  samplingInterval.value = useVideoInput.value ? DEFAULT_VIDEO_LIVE_INTERVAL : DEFAULT_INTERVAL
 }
 
 const resultText = ref('')
@@ -113,6 +120,101 @@ const audioVolume = ref(0)
 const audioStatus = ref('')
 let writeIdx = 0
 let animationFrameId: number | null = null
+const useVideoInput = ref(true) // Default to true as it's the requested upgrade
+const videoFrameCount = ref(8)
+const videoFrameInterval = ref(1000)
+const frameBuffer = ref<string[]>([])
+let frameCaptureIntervalId: number | null = null
+
+function updateFrameBuffer(): void {
+  const video = videoRef.value
+  const canvas = canvasRef.value
+  if (!video || !canvas || video.readyState < 2) return
+
+  const vWidth = video.videoWidth
+  const vHeight = video.videoHeight
+  const cWidth = video.clientWidth
+  const cHeight = video.clientHeight
+  if (!vWidth || !vHeight || !cWidth || !cHeight) return
+
+  const ctx = canvas.getContext('2d')
+  if (!ctx) return
+
+  const videoAspect = vWidth / vHeight
+  const elementAspect = cWidth / cHeight
+
+  let actualWidth = cWidth
+  let actualHeight = cHeight
+  let marginLeft = 0
+  let marginTop = 0
+
+  if (elementAspect > videoAspect) {
+    actualWidth = cHeight * videoAspect
+    marginLeft = (cWidth - actualWidth) / 2
+  } else {
+    actualHeight = cWidth / videoAspect
+    marginTop = (cHeight - actualHeight) / 2
+  }
+
+  const scaleX = vWidth / actualWidth
+  const scaleY = vHeight / actualHeight
+
+  const cropX = (cropBox.value.x - marginLeft) * scaleX
+  const cropY = (cropBox.value.y - marginTop) * scaleY
+  const cropW = cropBox.value.width * scaleX
+  const cropH = cropBox.value.height * scaleY
+
+  canvas.width = cropW
+  canvas.height = cropH
+  ctx.drawImage(video, cropX, cropY, cropW, cropH, 0, 0, cropW, cropH)
+  const dataUrl = canvas.toDataURL('image/jpeg', 0.7) // Lower quality for video frames to save memory
+
+  frameBuffer.value.push(dataUrl)
+  if (frameBuffer.value.length > videoFrameCount.value) {
+    frameBuffer.value.shift()
+  }
+}
+
+function startFrameCapture(): void {
+  stopFrameCapture()
+  frameCaptureIntervalId = window.setInterval(updateFrameBuffer, videoFrameInterval.value)
+}
+
+function stopFrameCapture(): void {
+  if (frameCaptureIntervalId !== null) {
+    clearInterval(frameCaptureIntervalId)
+    frameCaptureIntervalId = null
+  }
+}
+
+watch([videoFrameInterval, useVideoInput], () => {
+  if (useVideoInput.value) {
+    startFrameCapture()
+    // Auto-update prompt if it matches a default image prompt
+    if (promptText.value === DEFAULT_PROMPT) {
+      promptText.value = DEFAULT_VIDEO_PROMPT
+    } else if (promptText.value === DEFAULT_MULTIMODAL_PROMPT) {
+      promptText.value = DEFAULT_MULTIMODAL_VIDEO_PROMPT
+    }
+    // Update live interval for video mode efficiency
+    if (samplingInterval.value === DEFAULT_INTERVAL) {
+      samplingInterval.value = DEFAULT_VIDEO_LIVE_INTERVAL
+    }
+  } else {
+    stopFrameCapture()
+    frameBuffer.value = []
+    // Auto-update prompt if it matches a default video prompt
+    if (promptText.value === DEFAULT_VIDEO_PROMPT) {
+      promptText.value = DEFAULT_PROMPT
+    } else if (promptText.value === DEFAULT_MULTIMODAL_VIDEO_PROMPT) {
+      promptText.value = DEFAULT_MULTIMODAL_PROMPT
+    }
+    // Restore live interval
+    if (samplingInterval.value === DEFAULT_VIDEO_LIVE_INTERVAL) {
+      samplingInterval.value = DEFAULT_INTERVAL
+    }
+  }
+})
 
 const AUDIO_SOURCE_VIDEO = '__video_audio__'
 let videoSourceNode: MediaElementAudioSourceNode | null = null
@@ -198,10 +300,14 @@ watch([includeAudio, selectedAudioSourceId], async () => {
     await startAudioCapture()
     if (promptText.value === DEFAULT_PROMPT) {
       promptText.value = DEFAULT_MULTIMODAL_PROMPT
+    } else if (promptText.value === DEFAULT_VIDEO_PROMPT) {
+      promptText.value = DEFAULT_MULTIMODAL_VIDEO_PROMPT
     }
   } else if (audioContext) {
     if (promptText.value === DEFAULT_MULTIMODAL_PROMPT) {
       promptText.value = DEFAULT_PROMPT
+    } else if (promptText.value === DEFAULT_MULTIMODAL_VIDEO_PROMPT) {
+      promptText.value = DEFAULT_VIDEO_PROMPT
     }
     if (animationFrameId) {
       cancelAnimationFrame(animationFrameId)
@@ -422,6 +528,9 @@ onMounted(async () => {
   if (includeAudio.value) {
     startAudioCapture()
   }
+  if (useVideoInput.value) {
+    startFrameCapture()
+  }
   // Listen for clear events from the log window
   window.electron.ipcRenderer.on('notify-log-cleared', () => {
     notifyLog.value = []
@@ -548,6 +657,10 @@ async function captureAndAnalyze(): Promise<void> {
   ctx.drawImage(video, cropX, cropY, cropW, cropH, 0, 0, cropW, cropH)
   const dataUrl = canvas?.toDataURL('image/jpeg')
 
+  const dataUrls = useVideoInput.value ? [...frameBuffer.value] : [dataUrl]
+  // Ensure we have at least one frame
+  if (dataUrls.length === 0 && dataUrl) dataUrls.push(dataUrl)
+
   isLoading.value = true
   if (isStreaming.value) {
     let timestamp: string
@@ -617,7 +730,7 @@ async function captureAndAnalyze(): Promise<void> {
     type: 'generate',
     payload: {
       promptText: promptText.value,
-      dataUrl,
+      dataUrls, // Changed from dataUrl to dataUrls
       audioData,
       samplingRate: 16000 // Always 16000 now
     }
@@ -665,6 +778,7 @@ function onMouseUp(): void {
 onUnmounted(() => {
   window.removeEventListener('mousemove', onMouseMove)
   window.removeEventListener('mouseup', onMouseUp)
+  stopFrameCapture()
   worker?.terminate()
 })
 </script>
@@ -764,7 +878,55 @@ onUnmounted(() => {
           </div>
         </div>
 
-        <!-- Row 4: Prompt + Capture & Analyze -->
+        <!-- Row 4: Video Analysis Config -->
+        <div class="control-row video-config-row">
+          <div class="control-row-left">
+            <div class="control-group">
+              <label class="checkbox-label video-mode-toggle">
+                <input v-model="useVideoInput" type="checkbox" />
+                Video Analysis Mode
+              </label>
+            </div>
+            <div v-if="useVideoInput" class="video-settings-group">
+              <div class="control-group">
+                <label>Analysis Frames</label>
+                <input
+                  v-model.number="videoFrameCount"
+                  type="number"
+                  min="1"
+                  max="32"
+                  style="width: 60px"
+                />
+              </div>
+              <div class="control-group">
+                <label>Capture Interval (ms)</label>
+                <input
+                  v-model.number="videoFrameInterval"
+                  type="number"
+                  min="200"
+                  step="100"
+                  style="width: 80px"
+                />
+              </div>
+            </div>
+          </div>
+          <div class="control-row-right">
+            <div v-if="useVideoInput" class="buffer-info">
+              <span class="buffer-label">Buffer Status:</span>
+              <div class="buffer-visual">
+                <div
+                  v-for="i in videoFrameCount"
+                  :key="i"
+                  class="buffer-dot"
+                  :class="{ filled: i <= frameBuffer.length }"
+                ></div>
+              </div>
+              <span class="buffer-count">{{ frameBuffer.length }} / {{ videoFrameCount }}</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- Row 5: Prompt + Capture & Analyze -->
         <div class="control-row">
           <div class="control-row-left">
             <div class="control-group prompt-group">
@@ -791,7 +953,7 @@ onUnmounted(() => {
           </div>
         </div>
 
-        <!-- Row 5: Live Interval + Start Live Analysis -->
+        <!-- Row 6: Live Interval + Start Live Analysis -->
         <div class="control-row">
           <div class="control-row-left">
             <div class="control-group">
@@ -837,6 +999,24 @@ onUnmounted(() => {
           crossorigin="anonymous"
           playsinline
         ></video>
+
+        <!-- Video Mode Scope Overlay -->
+        <div v-if="useVideoInput" class="video-mode-overlay">
+          <div class="video-mode-badge">VIDEO ANALYSIS ACTIVE</div>
+          <div class="buffer-status-overlay">
+            <div class="overlay-track">
+              <div
+                class="overlay-progress"
+                :style="{ width: (frameBuffer.length / videoFrameCount) * 100 + '%' }"
+              ></div>
+            </div>
+            <div class="overlay-label">
+              {{ frameBuffer.length }} frames captured ({{
+                Math.round((videoFrameCount * videoFrameInterval) / 1000)
+              }}s window)
+            </div>
+          </div>
+        </div>
 
         <!-- Selection Box Overlay (hidden in video file mode) -->
         <div
@@ -933,6 +1113,9 @@ body {
   display: flex;
   flex-direction: column;
   height: 100vh;
+  width: 100%;
+  max-width: 100vw;
+  overflow-x: hidden;
 }
 .header {
   background: white;
@@ -1116,6 +1299,103 @@ body {
 .capture-btn:hover:not(:disabled) {
   background: #2d5a9e !important;
 }
+.video-config-row {
+  background: #f8f9fa;
+  padding: 8px 12px;
+  border-radius: 8px;
+  border: 1px solid #e9ecef;
+  margin-top: 4px;
+}
+.video-mode-toggle {
+  color: #3867d6;
+}
+.video-settings-group {
+  display: flex;
+  gap: 20px;
+  margin-left: 20px;
+  padding-left: 20px;
+  border-left: 1px solid #dee2e6;
+}
+.buffer-info {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-size: 11px;
+  color: #666;
+}
+.buffer-visual {
+  display: flex;
+  flex-wrap: wrap; /* Allow dots to wrap if too many */
+  gap: 3px;
+  max-width: 150px; /* Cap width to prevent layout push */
+  justify-content: flex-end;
+}
+.buffer-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: #dee2e6;
+  transition: background 0.2s;
+}
+.buffer-dot.filled {
+  background: #2ed573;
+  box-shadow: 0 0 4px rgba(46, 213, 115, 0.5);
+}
+.buffer-count {
+  font-family: monospace;
+  min-width: 45px;
+}
+.video-mode-overlay {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  pointer-events: none;
+  border: 2px solid rgba(56, 103, 214, 0.3);
+  z-index: 3;
+}
+.video-mode-badge {
+  position: absolute;
+  top: 10px;
+  left: 10px;
+  background: rgba(56, 103, 214, 0.8);
+  color: white;
+  padding: 2px 8px;
+  border-radius: 4px;
+  font-size: 10px;
+  font-weight: bold;
+  letter-spacing: 1px;
+}
+.buffer-status-overlay {
+  position: absolute;
+  bottom: 10px;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 200px;
+  background: rgba(0, 0, 0, 0.6);
+  padding: 6px 10px;
+  border-radius: 6px;
+  backdrop-filter: blur(4px);
+}
+.overlay-track {
+  width: 100%;
+  height: 4px;
+  background: rgba(255, 255, 255, 0.2);
+  border-radius: 2px;
+  overflow: hidden;
+  margin-bottom: 4px;
+}
+.overlay-progress {
+  height: 100%;
+  background: #2ed573;
+  transition: width 0.3s;
+}
+.overlay-label {
+  color: white;
+  font-size: 9px;
+  text-align: center;
+}
 .status {
   margin-top: 10px;
   font-size: 13px;
@@ -1172,6 +1452,8 @@ body {
 }
 .sidebar {
   flex: 1;
+  min-width: 320px; /* Prevent sidebar from collapsing too much */
+  max-width: 450px; /* Prevent sidebar from taking over */
   background: white;
   border-radius: 8px;
   padding: 15px;
