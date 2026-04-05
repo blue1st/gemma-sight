@@ -1,0 +1,136 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>GemmaSight - ドキュメント</title>
+  <link rel="stylesheet" href="style.css">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;700;900&display=swap" rel="stylesheet">
+  <meta name="description" content="GemmaSight - Gemma 4を搭載したリアルタイム画面解析・音声解析アプリケーションの公式ドキュメントです。インストールから操作方法まで詳しく解説します。">
+</head>
+<body>
+  <header>
+    <div class="logo">GemmaSight</div>
+    <nav class="nav-links">
+      <a href="#install">インストール</a>
+      <a href="#forms">各項目解説</a>
+      <a href="#operation">操作方法</a>
+      <a href="#github" class="btn btn-primary" style="padding: 0.5rem 1.2rem;">GitHub</a>
+    </nav>
+  </header>
+
+  <main>
+    <!-- Hero -->
+    <section class="hero">
+      <div class="hero-content">
+        <h1>GemmaSight Documentation</h1>
+        <p>Gemma 4 & Transformers.js を活用した、次世代の画面・音声統合解析ツールのマニュアルです。</p>
+        <img src="images/hero.png" alt="GemmaSight Hero" class="hero-image">
+      </div>
+    </section>
+
+    <!-- Installation -->
+    <section id="install">
+      <h2>インストール方法</h2>
+      <div class="step">
+        <div class="step-content">
+          <div class="step-number">01</div>
+          <h3>リポジトリのクローン</h3>
+          <p>GitHubからソースコードを取得します。最新の安定版を使用するために、メインブランチをクローンしてください。</p>
+          <pre><code>git clone https://github.com/blue1st/gemma-sight.git
+cd gemma-sight</code></pre>
+        </div>
+      </div>
+
+      <div class="step">
+        <div class="step-content">
+          <div class="step-number">02</div>
+          <h3>依存関係のインストール</h3>
+          <p>npm を使用して必要なパッケージをインストールします。Electron の依存関係も自動的にセットアップされます。</p>
+          <pre><code>npm install</code></pre>
+        </div>
+      </div>
+
+      <div class="step">
+        <div class="step-content">
+          <div class="step-number">03</div>
+          <h3>開発モードでの起動</h3>
+          <p>以下のコマンドを実行すると、開発用サーバーが立ち上がり、Electron アプリケーションが起動します。</p>
+          <pre><code>npm run dev</code></pre>
+        </div>
+      </div>
+    </section>
+
+    <!-- Form Descriptions -->
+    <section id="forms">
+      <h2>各フォーム・入力の解説</h2>
+      <div class="grid">
+        <div class="card">
+          <h3>Source Type</h3>
+          <p>解析対象を選択します。</p>
+          <ul>
+            <li><strong>Screen / Window</strong>: 特定のディスプレイやウィンドウ。</li>
+            <li><strong>WebCam</strong>: 内蔵または外付けカメラ。</li>
+            <li><strong>Video File</strong>: ローカルの動画ファイル。</li>
+          </ul>
+        </div>
+        <div class="card">
+          <h3>Audio Source</h3>
+          <p>音声解析に使用するソースを選びます。マイク入力や、動画ファイル内の音声（Internal）をサポートしています。</p>
+        </div>
+        <div class="card">
+          <h3>Model Selection</h3>
+          <p>解析エンジンを選択します。</p>
+          <ul>
+            <li><strong>E2B (Rapid)</strong>: 高速なレスポンスを重視。</li>
+            <li><strong>E4B (Smart)</strong>: より詳細で正確な分析。</li>
+          </ul>
+        </div>
+        <div class="card">
+          <h3>Prompt</h3>
+          <p>AIへの指示を記述します。デフォルトでは日本語での要約が設定されていますが、自由にカスタマイズ可能です。</p>
+        </div>
+        <div class="card">
+          <h3>Sampling Interval</h3>
+          <p>「ライブ解析」を行う際の間隔（ミリ秒）を指定します。デフォルトは2000ms（2秒ごと）です。</p>
+        </div>
+        <div class="card">
+          <h3>Regex Notification</h3>
+          <p>解析結果に特定のパターンが含まれた際、OS通知を出し、ログに記録する設定です。</p>
+        </div>
+      </div>
+    </section>
+
+    <!-- Operation Methods -->
+    <section id="operation">
+      <h2>基本的な操作方法</h2>
+      <div class="step">
+        <div class="step-content">
+          <h3>1. 解析範囲（クロップ）の設定</h3>
+          <p>画面中央に表示される青枠をドラッグして、解析したい範囲を指定します。枠の右下を掴むことでサイズ変更も可能です。</p>
+        </div>
+      </div>
+
+      <div class="step">
+        <div class="step-content">
+          <h3>2. モデルのロード</h3>
+          <p>初回起動時やモデル変更時は「Load Model」をクリックしてください。WebGPUを利用したモデルがブラウザ（Electron）のキャッシュにダウンロードされます。</p>
+        </div>
+      </div>
+
+      <div class="step">
+        <div class="step-content">
+          <h3>3. 解析の実行</h3>
+          <p><strong>Capture & Analyze</strong> をクリックすると一回限りの解析を行います。<strong>Start Live Analysis</strong> を押すと、設定した間隔で継続的な解析が行われます。</p>
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <footer style="padding: 4rem 10%; text-align: center; border-top: 1px solid var(--glass-border);">
+    <p>© 2026 GemmaSight - Powering Intelligence Everywhere.</p>
+  </footer>
+</body>
+</html>

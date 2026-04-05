@@ -11,6 +11,7 @@ GemmaSight is a desktop application that allows you to capture any portion of yo
 - **Gemma 4 Integration**: Leverages the state-of-the-art Gemma 4 models for high-quality visual understanding.
 - **Customizable Prompts**: Ask specific questions about your screen or get general descriptions.
 - **Cross-Platform**: Built with Electron, Vue 3, and TypeScript.
+- **Detailed Documentation**: ✨ [GemmaSight ドキュメント (GitHub Pages)](https://blue1st.github.io/gemma-sight/)
 
 ## Getting Started
 
