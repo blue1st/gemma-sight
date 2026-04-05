@@ -1,4 +1,4 @@
-import { app, shell, BrowserWindow, ipcMain, desktopCapturer, dialog, protocol } from 'electron'
+import { app, shell, BrowserWindow, ipcMain, desktopCapturer, dialog, protocol, nativeImage } from 'electron'
 import { join } from 'path'
 import { electronApp, optimizer, is } from '@electron-toolkit/utils'
 import icon from '../../resources/icon.png?asset'
@@ -125,7 +125,7 @@ function createWindow(): void {
     show: false,
     autoHideMenuBar: true,
     title: `${app.getName()} v${app.getVersion()}`,
-    ...(process.platform === 'linux' ? { icon } : {}),
+    ...(process.platform === 'linux' || process.platform === 'darwin' ? { icon } : {}),
     webPreferences: {
       preload: join(__dirname, '../preload/index.js'),
       sandbox: false
@@ -343,6 +343,11 @@ app.whenReady().then(() => {
       mainWin.webContents.send('notify-log-cleared')
     }
   })
+
+  // Set dock icon for macOS in development
+  if (process.platform === 'darwin' && is.dev) {
+    app.dock?.setIcon(nativeImage.createFromPath(icon))
+  }
 
   createWindow()
 
