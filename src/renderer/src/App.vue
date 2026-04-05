@@ -8,7 +8,7 @@ interface ScreenSource {
 }
 
 const includeAudio = ref(false)
-const useVideoInput = ref(true) // Default to true as it's the requested upgrade
+const useVideoInput = ref(false) // Default to false
 const videoFrameCount = ref(8)
 const videoFrameInterval = ref(1000)
 
@@ -136,6 +136,8 @@ const audioBuffer = ref<Float32Array | null>(null)
 const audioVolume = ref(0)
 const frameBuffer = ref<string[]>([])
 let frameCaptureIntervalId: number | null = null
+const isBufferUpdating = ref(false)
+let updateTimeout: number | null = null
 
 function updateFrameBuffer(): void {
   const video = videoRef.value
@@ -184,6 +186,13 @@ function updateFrameBuffer(): void {
   if (frameBuffer.value.length > videoFrameCount.value) {
     frameBuffer.value.shift()
   }
+
+  // Trigger flash effect
+  isBufferUpdating.value = true
+  if (updateTimeout) clearTimeout(updateTimeout)
+  updateTimeout = window.setTimeout(() => {
+    isBufferUpdating.value = false
+  }, 300)
 }
 
 function startFrameCapture(): void {
@@ -961,7 +970,10 @@ onUnmounted(() => {
                   v-for="i in videoFrameCount"
                   :key="i"
                   class="buffer-dot"
-                  :class="{ filled: i <= frameBuffer.length }"
+                  :class="{
+                    filled: i <= frameBuffer.length,
+                    updating: isBufferUpdating && i === frameBuffer.length
+                  }"
                 ></div>
               </div>
               <span class="buffer-count">{{ frameBuffer.length }} / {{ videoFrameCount }}</span>
@@ -1389,6 +1401,12 @@ body {
 .buffer-dot.filled {
   background: #2ed573;
   box-shadow: 0 0 4px rgba(46, 213, 115, 0.5);
+  transition: all 0.2s ease;
+}
+.buffer-dot.filled.updating {
+  background: #55efc4;
+  box-shadow: 0 0 12px #55efc4;
+  transform: scale(1.3);
 }
 .buffer-count {
   font-family: monospace;
@@ -1438,7 +1456,14 @@ body {
 .overlay-progress {
   height: 100%;
   background: #2ed573;
-  transition: width 0.3s;
+  transition:
+    width 0.3s,
+    background 0.2s,
+    box-shadow 0.2s;
+}
+.overlay-progress.updating {
+  background: #55efc4;
+  box-shadow: 0 0 10px #55efc4;
 }
 .overlay-label {
   color: white;

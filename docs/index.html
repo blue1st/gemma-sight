@@ -1,233 +1,397 @@
-<!DOCTYPE html>
+<!doctype html>
 <html lang="ja">
-<head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>GemmaSight - ドキュメント</title>
-  <link rel="stylesheet" href="style.css">
-  <link rel="preconnect" href="https://fonts.googleapis.com">
-  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;700;900&display=swap" rel="stylesheet">
-  <meta name="description" content="GemmaSight - Gemma 4を搭載したリアルタイム画面解析・音声解析アプリケーションの公式ドキュメントです。インストールから操作方法まで詳しく解説します。">
-</head>
-<body>
-  <header>
-    <div class="logo">GemmaSight</div>
-    <nav class="nav-links">
-      <a href="#features">活用シーン</a>
-      <a href="#requirements">動作要件</a>
-      <a href="#install">インストール</a>
-      <a href="#forms">各項目解説</a>
-      <a href="#operation">操作方法</a>
-      <a href="https://github.com/blue1st/gemma-sight" class="btn btn-primary" style="padding: 0.5rem 1.2rem;" target="_blank">GitHub</a>
-    </nav>
-  </header>
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>GemmaSight - ドキュメント</title>
+    <link rel="stylesheet" href="style.css" />
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Inter:wght@400;700;900&display=swap"
+      rel="stylesheet"
+    />
+    <meta
+      name="description"
+      content="GemmaSight - Gemma 4を搭載したリアルタイム画面解析・音声解析アプリケーションの公式ドキュメントです。インストールから操作方法まで詳しく解説します。"
+    />
+  </head>
+  <body>
+    <header>
+      <div class="logo">GemmaSight</div>
+      <nav class="nav-links">
+        <a href="#features">活用シーン</a>
+        <a href="#requirements">動作要件</a>
+        <a href="#install">インストール</a>
+        <a href="#forms">各項目解説</a>
+        <a href="#operation">操作方法</a>
+        <a
+          href="https://github.com/blue1st/gemma-sight"
+          class="btn btn-primary"
+          style="padding: 0.5rem 1.2rem"
+          target="_blank"
+          >GitHub</a
+        >
+      </nav>
+    </header>
 
-  <main>
-    <!-- Hero -->
-    <section class="hero" style="height: auto; padding-bottom: 50px;">
-      <div class="hero-content">
-        <h1>GemmaSight Documentation</h1>
-        <p>Gemma 4 & Transformers.js を活用した、<strong>完全ローカル実行</strong>の次世代 画面・音声統合解析ツールのマニュアルです。</p>
-        <img src="images/startup.png" alt="GemmaSight Startup" class="hero-image">
-      </div>
-    </section>
-
-    <!-- Use Cases/Features -->
-    <section id="features" style="background: rgba(255, 255, 255, 0.02); border-top: 1px solid var(--glass-border); border-bottom: 1px solid var(--glass-border);">
-      <h2 style="margin-bottom: 1rem;">広がる活用シーン</h2>
-      <p style="text-align: center; color: #a4b0be; max-width: 700px; margin: 0 auto 3rem;">
-        GemmaSightは、単なる解析ツールではありません。画面上の視覚情報と音声を組み合わせることで、工夫次第で活用の幅は無限に広がります。
-      </p>
-        <div class="card" style="border-color: var(--accent-color); background: rgba(46, 213, 115, 0.05);">
-          <div style="font-size: 2rem; margin-bottom: 1rem;">🔒</div>
-          <h3>完全ローカル・プライバシー重視</h3>
-          <p>すべての解析はデバイス上のWebGPUを利用して行われます。画像や音声データが外部サーバーに送信されることはありません（※モデルの初回ロード時のみインターネット接続が必要です。一度ロードされた後は完全にオフラインで動作します）。</p>
-        </div>
-        <div class="card">
-          <div style="font-size: 2rem; margin-bottom: 1rem;">📑</div>
-          <h3>作業記録の自動化</h3>
-          <p>日々の業務内容をリアルタイムで要約。何にどれだけ時間を使っているか、作業ログとしての振り返りに活用できます。</p>
-        </div>
-        <div class="card">
-          <div style="font-size: 2rem; margin-bottom: 1rem;">🎞️</div>
-          <h3>動画・配信のアーカイブ把握</h3>
-          <p>長時間の動画やライブ配信の内容を時系列で追跡。重要なシーンや発言を抽出し、効率的なキャッチアップを可能にします。</p>
-        </div>
-        <div class="card">
-          <div style="font-size: 2rem; margin-bottom: 1rem;">🔍</div>
-          <h3>画面変化の自動検知</h3>
-          <p>株価やシステム監視など、特定の条件やパターンが出現した際にAIが検知。正規表現と組み合わせて通知を受け取れます。</p>
-        </div>
-        <div class="card">
-          <div style="font-size: 2rem; margin-bottom: 1rem;">💡</div>
-          <h3>自由なアイデアで</h3>
-          <p>プログラミングのデバッグ補助、ゲームの実況解析、プレゼンの振り返りなど、あなたのアイデア次第でまったく新しい使い方が見つかります。</p>
-        </div>
-      </div>
-    </section>
-  
-    <!-- System Requirements -->
-    <section id="requirements" style="background: rgba(255, 255, 255, 0.02); border-bottom: 1px solid var(--glass-border); padding: 60px 10%;">
-      <h2 style="font-size: 2rem; margin-bottom: 3rem;">動作要件</h2>
-      <div class="grid">
-        <div class="card">
-          <div style="font-size: 1.5rem; margin-bottom: 1rem;">💻</div>
-          <h3>OS / 環境</h3>
+    <main>
+      <!-- Hero -->
+      <section class="hero" style="height: auto; padding-bottom: 50px">
+        <div class="hero-content">
+          <h1>GemmaSight Documentation</h1>
           <p>
-            <strong>macOS</strong>: 13.x (Ventura) 以降推奨<br>
-            <strong>Windows</strong>: 10 / 11 (最新のビルド)<br>
-            ※内部でブラウザ(Chromium)のWebGPU機能を利用します。
+            Gemma 4 & Transformers.js を活用した、<strong>完全ローカル実行</strong>の次世代
+            画面・音声統合解析ツールのマニュアルです。
           </p>
+          <img src="images/startup.png" alt="GemmaSight Startup" class="hero-image" />
         </div>
-        <div class="card">
-          <div style="font-size: 1.5rem; margin-bottom: 1rem;">⚡</div>
-          <h3>GPU (WebGPU対応)</h3>
-          <p>
-            <strong>Mac</strong>: Apple Silicon (M1/M2/M3) 搭載機を強く推奨します。<br>
-            <strong>Windows</strong>: DirectX 12 または Vulkan に対応したGPUと最新ドライバが必要です。
-          </p>
-        </div>
-        <div class="card">
-          <div style="font-size: 1.5rem; margin-bottom: 1rem;">🧠</div>
-          <h3>メモリ (RAM)</h3>
-          <p>
-            8GB以上のメモリ推奨。<br>
-            AIモデルのロードと解析をスムーズに行うためには十分なメモリ空き容量が必要です。
-          </p>
-        </div>
-      </div>
-    </section>
+      </section>
 
-    <!-- Installation -->
-    <section id="install">
-      <h2>インストール方法</h2>
-      <div class="step">
-        <div class="step-content">
-          <div class="step-number">01</div>
-          <h3>実行ファイルのダウンロード</h3>
-          <p>GitHubの <strong>Releases</strong> ページから、お使いのOSに合った最新の実行ファイルをダウンロードします。</p>
-          <a href="https://github.com/blue1st/gemma-sight/releases" class="btn btn-primary" target="_blank">Releases ページへ</a>
-        </div>
-      </div>
-
-      <div class="step">
-        <div class="step-content">
-          <div class="step-number">02</div>
-          <h3>アプリケーションのインストール</h3>
-          <p>ダウンロードしたアーカイブを展開、またはインストーラーを実行します。</p>
-          <ul>
-            <li><strong>macOS (.dmg)</strong>: DMGファイルを開き、アイコンを「Applications」フォルダへドラッグ＆ドロップしてください。</li>
-            <li><strong>Windows (.exe)</strong>: インストーラーまたは実行ファイルを実行してください。</li>
-          </ul>
-          <img src="images/mac-install.png" alt="macOS Installation" class="screenshot" style="max-width: 500px;">
-        </div>
-      </div>
-
-      <div class="step">
-        <div class="step-content">
-          <div class="step-number">03</div>
-          <h3>セキュリティ許可 (macOS)</h3>
-          <p>macOSの場合、開発元が未確認のため開けないという警告が表示される場合があります。その場合は、システム設定の <strong>「プライバシーとセキュリティ」</strong> を開き、 <strong>「セキュリティ」</strong> セクションで「このまま開く」を選択してください。</p>
-          <div style="display: flex; gap: 1.5rem; flex-wrap: wrap; justify-content: center; align-items: start; margin-top: 1.5rem;">
-            <img src="images/mac-security-alert.png" alt="Security Alert" class="screenshot" style="max-width: 260px; margin: 0;">
-            <img src="images/mac-security-setting.png" alt="Security Setting" class="screenshot" style="max-width: 500px; margin: 0;">
+      <!-- Use Cases/Features -->
+      <section
+        id="features"
+        style="
+          background: rgba(255, 255, 255, 0.02);
+          border-top: 1px solid var(--glass-border);
+          border-bottom: 1px solid var(--glass-border);
+        "
+      >
+        <h2 style="margin-bottom: 1rem">広がる活用シーン</h2>
+        <p style="text-align: center; color: #a4b0be; max-width: 700px; margin: 0 auto 3rem">
+          GemmaSightは、単なる解析ツールではありません。画面上の視覚情報と音声を組み合わせることで、工夫次第で活用の幅は無限に広がります。
+        </p>
+        <div class="grid">
+          <div
+            class="card"
+            style="border-color: var(--accent-color); background: rgba(46, 213, 115, 0.05)"
+          >
+            <div style="font-size: 2rem; margin-bottom: 1rem">🔒</div>
+            <h3>完全ローカル・プライバシー重視</h3>
+            <p>
+              すべての解析はデバイス上のWebGPUを利用して行われます。画像や音声データが外部サーバーに送信されることはありません（※モデルの初回ロード時のみインターネット接続が必要です。一度ロードされた後は完全にオフラインで動作します）。
+            </p>
+          </div>
+          <div class="card">
+            <div style="font-size: 2rem; margin-bottom: 1rem">📑</div>
+            <h3>作業記録の自動化</h3>
+            <p>
+              日々の業務内容をリアルタイムで要約。何にどれだけ時間を使っているか、作業ログとしての振り返りに活用できます。
+            </p>
+          </div>
+          <div class="card">
+            <div style="font-size: 2rem; margin-bottom: 1rem">🎞️</div>
+            <h3>動画・配信のアーカイブ把握</h3>
+            <p>
+              長時間の動画やライブ配信の内容を時系列で追跡。重要なシーンや発言を抽出し、効率的なキャッチアップを可能にします。
+            </p>
+          </div>
+          <div class="card">
+            <div style="font-size: 2rem; margin-bottom: 1rem">🔍</div>
+            <h3>画面変化の自動検知</h3>
+            <p>
+              株価やシステム監視など、特定の条件やパターンが出現した際にAIが検知。正規表現と組み合わせて通知を受け取れます。
+            </p>
+          </div>
+          <div class="card">
+            <div style="font-size: 2rem; margin-bottom: 1rem">💡</div>
+            <h3>自由なアイデアで</h3>
+            <p>
+              プログラミングのデバッグ補助、ゲームの実況解析、プレゼンの振り返りなど、あなたのアイデア次第でまったく新しい使い方が見つかります。
+            </p>
           </div>
         </div>
-      </div>
+      </section>
 
-      <div class="step">
-        <div class="step-content">
-          <div class="step-number">04</div>
-          <h3>アクセス権限の許可 (macOS)</h3>
-          <p>画面解析や音声解析を正常に行うために、初回実行時に <strong>「画面収録」</strong> および <strong>「システムオーディオ録音（またはマイク）」</strong> の許可が求められます。</p>
-          <img src="images/mac-audio-alert.png" alt="Audio Permission Alert" class="screenshot" style="max-width: 460px;">
-          <p>正しく動作しない場合は、システム設定の <strong>「プライバシーとセキュリティ」</strong> 内の各項目で <strong>GemmaSight</strong> にチェックが入っているか確認してください。</p>
-          <img src="images/mac-audio-setup.png" alt="Mac System Audio Settings" class="screenshot" style="max-width: 600px;">
+      <!-- System Requirements -->
+      <section
+        id="requirements"
+        style="
+          background: rgba(255, 255, 255, 0.02);
+          border-bottom: 1px solid var(--glass-border);
+          padding: 60px 10%;
+        "
+      >
+        <h2 style="font-size: 2rem; margin-bottom: 3rem">動作要件</h2>
+        <div class="grid">
+          <div class="card">
+            <div style="font-size: 1.5rem; margin-bottom: 1rem">💻</div>
+            <h3>OS / 環境</h3>
+            <p>
+              <strong>macOS</strong>: 13.x (Ventura) 以降推奨<br />
+              <strong>Windows</strong>: 10 / 11 (最新のビルド)<br />
+              ※内部でブラウザ(Chromium)のWebGPU機能を利用します。
+            </p>
+          </div>
+          <div class="card">
+            <div style="font-size: 1.5rem; margin-bottom: 1rem">⚡</div>
+            <h3>GPU (WebGPU対応)</h3>
+            <p>
+              <strong>Mac</strong>: Apple Silicon (M1/M2/M3) 搭載機を強く推奨します。<br />
+              <strong>Windows</strong>: DirectX 12 または Vulkan
+              に対応したGPUと最新ドライバが必要です。
+            </p>
+          </div>
+          <div class="card">
+            <div style="font-size: 1.5rem; margin-bottom: 1rem">🧠</div>
+            <h3>メモリ (RAM)</h3>
+            <p>
+              8GB以上のメモリ推奨。<br />
+              AIモデルのロードと解析をスムーズに行うためには十分なメモリ空き容量が必要です。
+            </p>
+          </div>
         </div>
-      </div>
-    </section>
+      </section>
 
-    <!-- Form Descriptions -->
-    <section id="forms">
-      <h2>各フォーム・入力の解説</h2>
-      <div class="grid">
-        <div class="card">
-          <h3>Source Type</h3>
-          <p>解析対象を選択します。</p>
-          <ul>
-            <li><strong>Screen / Window</strong>: 特定のディスプレイやウィンドウ。</li>
-            <li><strong>WebCam</strong>: 内蔵または外付けカメラ。</li>
-            <li><strong>Video File</strong>: ローカルの動画ファイル。</li>
-          </ul>
+      <!-- Installation -->
+      <section id="install">
+        <h2>インストール方法</h2>
+        <div class="step">
+          <div class="step-content">
+            <div class="step-number">01</div>
+            <h3>実行ファイルのダウンロード</h3>
+            <p>
+              GitHubの
+              <strong>Releases</strong>
+              ページから、お使いのOSに合った最新の実行ファイルをダウンロードします。
+            </p>
+            <a
+              href="https://github.com/blue1st/gemma-sight/releases"
+              class="btn btn-primary"
+              target="_blank"
+              >Releases ページへ</a
+            >
+          </div>
         </div>
-        <div class="card">
-          <h3>Audio Source</h3>
-          <p>音声解析に使用するソースを選びます。マイク入力や、動画ファイル内の音声（Internal）をサポートしています。</p>
-        </div>
-        <div class="card">
-          <h3>Model Selection</h3>
-          <p>解析エンジンを選択します。</p>
-          <ul>
-            <li><strong>E2B (Rapid)</strong>: 高速なレスポンスを重視。</li>
-            <li><strong>E4B (Smart)</strong>: より詳細で正確な分析。</li>
-          </ul>
-        </div>
-        <div class="card">
-          <h3>Prompt</h3>
-          <p>AIへの指示を記述します。デフォルトでは日本語での要約が設定されていますが、自由にカスタマイズ可能です。</p>
-        </div>
-        <div class="card">
-          <h3>Sampling Interval</h3>
-          <p>「ライブ解析」を行う際の間隔（ミリ秒）を指定します。デフォルトは2000ms（2秒ごと）です。</p>
-        </div>
-        <div class="card">
-          <h3>Regex Notification</h3>
-          <p>解析結果に特定のパターンが含まれた際、OS通知を出し、ログに記録する設定です。</p>
-        </div>
-      </div>
-    </section>
 
-    <!-- Operation Methods -->
-    <section id="operation">
-      <h2>基本的な操作方法</h2>
-      <div class="step">
-        <div class="step-content">
-          <h3>1. 解析範囲（クロップ）の設定</h3>
-          <p>画面中央に表示される青枠をドラッグして、解析したい範囲を指定します。枠の右下を掴むことでサイズ変更も可能です。</p>
-          <img src="images/startup.png" alt="Startup Screen" class="screenshot">
+        <div class="step">
+          <div class="step-content">
+            <div class="step-number">02</div>
+            <h3>アプリケーションのインストール</h3>
+            <p>ダウンロードしたアーカイブを展開、またはインストーラーを実行します。</p>
+            <ul>
+              <li>
+                <strong>macOS (.dmg)</strong>:
+                DMGファイルを開き、アイコンを「Applications」フォルダへドラッグ＆ドロップしてください。
+              </li>
+              <li>
+                <strong>Windows (.exe)</strong>:
+                インストーラーまたは実行ファイルを実行してください。
+              </li>
+            </ul>
+            <img
+              src="images/mac-install.png"
+              alt="macOS Installation"
+              class="screenshot"
+              style="max-width: 500px"
+            />
+          </div>
         </div>
-      </div>
 
-      <div class="step">
-        <div class="step-content">
-          <h3>2. モデルのロード</h3>
-          <p>初回起動時やモデル変更時は「Load Model」をクリックしてください。WebGPU対応のモデルがHugging Faceよりダウンロードされ、ブラウザ（Electron）のキャッシュに保存されます。</p>
-          <p style="font-size: 0.9rem; color: #a4b0be;">※ダウンロード完了後は、インターネットに接続されていない環境（オフライン）でも解析を行うことが可能です。</p>
-        </div>
-      </div>
-
-      <div class="step">
-        <div class="step-content">
-          <h3>3. 解析の実行</h3>
-          <p><strong>Capture & Analyze</strong> をクリックすると一回限りの解析を行います。<strong>Start Live Analysis</strong> を押すと、設定した間隔で継続的な解析が行われます。</p>
-          <div style="display: flex; gap: 1.5rem; margin: 2rem 0; flex-wrap: wrap; align-items: start;">
-            <div style="flex: 1; min-width: 300px;">
-              <div style="font-size: 0.85rem; color: var(--primary-color); font-weight: bold; margin-bottom: 0.5rem; text-align: center;">Capture & Analyze</div>
-              <img src="images/capture.png" alt="Capture and Analyze" class="screenshot" style="margin-top: 0;">
-            </div>
-            <div style="flex: 1; min-width: 300px;">
-              <div style="font-size: 0.85rem; color: var(--primary-color); font-weight: bold; margin-bottom: 0.5rem; text-align: center;">Live Analysis</div>
-              <img src="images/live-analysis.png" alt="Live Analysis" class="screenshot" style="margin-top: 0;">
+        <div class="step">
+          <div class="step-content">
+            <div class="step-number">03</div>
+            <h3>セキュリティ許可 (macOS)</h3>
+            <p>
+              macOSの場合、開発元が未確認のため開けないという警告が表示される場合があります。その場合は、システム設定の
+              <strong>「プライバシーとセキュリティ」</strong> を開き、
+              <strong>「セキュリティ」</strong> セクションで「このまま開く」を選択してください。
+            </p>
+            <div
+              style="
+                display: flex;
+                gap: 1.5rem;
+                flex-wrap: wrap;
+                justify-content: center;
+                align-items: start;
+                margin-top: 1.5rem;
+              "
+            >
+              <img
+                src="images/mac-security-alert.png"
+                alt="Security Alert"
+                class="screenshot"
+                style="max-width: 260px; margin: 0"
+              />
+              <img
+                src="images/mac-security-setting.png"
+                alt="Security Setting"
+                class="screenshot"
+                style="max-width: 500px; margin: 0"
+              />
             </div>
           </div>
         </div>
-      </div>
-    </section>
-  </main>
 
-  <footer style="padding: 4rem 10%; text-align: center; border-top: 1px solid var(--glass-border);">
-    <p>© 2026 GemmaSight - Powering Intelligence Everywhere.</p>
-  </footer>
-</body>
+        <div class="step">
+          <div class="step-content">
+            <div class="step-number">04</div>
+            <h3>アクセス権限の許可 (macOS)</h3>
+            <p>
+              画面解析や音声解析を正常に行うために、初回実行時に
+              <strong>「画面収録」</strong> および
+              <strong>「システムオーディオ録音（またはマイク）」</strong> の許可が求められます。
+            </p>
+            <img
+              src="images/mac-audio-alert.png"
+              alt="Audio Permission Alert"
+              class="screenshot"
+              style="max-width: 460px"
+            />
+            <p>
+              正しく動作しない場合は、システム設定の
+              <strong>「プライバシーとセキュリティ」</strong> 内の各項目で
+              <strong>GemmaSight</strong> にチェックが入っているか確認してください。
+            </p>
+            <img
+              src="images/mac-audio-setup.png"
+              alt="Mac System Audio Settings"
+              class="screenshot"
+              style="max-width: 600px"
+            />
+          </div>
+        </div>
+      </section>
+
+      <!-- Form Descriptions -->
+      <section id="forms">
+        <h2>各フォーム・入力の解説</h2>
+        <div class="grid">
+          <div class="card">
+            <h3>Source Type</h3>
+            <p>解析対象を選択します。</p>
+            <ul>
+              <li><strong>Screen / Window</strong>: 特定のディスプレイやウィンドウ。</li>
+              <li><strong>WebCam</strong>: 内蔵または外付けカメラ。</li>
+              <li><strong>Video File</strong>: ローカルの動画ファイル。</li>
+            </ul>
+          </div>
+          <div class="card">
+            <h3>Audio Source</h3>
+            <p>
+              音声解析に使用するソースを選びます。マイク入力や、動画ファイル内の音声（Internal）をサポートしています。
+            </p>
+          </div>
+          <div class="card">
+            <h3>Model Selection</h3>
+            <p>解析エンジンを選択します。</p>
+            <ul>
+              <li><strong>E2B (Rapid)</strong>: 高速なレスポンスを重視。</li>
+              <li><strong>E4B (Smart)</strong>: より詳細で正確な分析。</li>
+            </ul>
+          </div>
+          <div class="card">
+            <h3>Prompt</h3>
+            <p>
+              AIへの指示を記述します。デフォルトでは日本語での要約が設定されていますが、自由にカスタマイズ可能です。
+            </p>
+          </div>
+          <div class="card">
+            <h3>Sampling Interval</h3>
+            <p>
+              「ライブ解析」を行う際の間隔（ミリ秒）を指定します。デフォルトは2000ms（2秒ごと）です。
+            </p>
+          </div>
+          <div class="card">
+            <h3>Regex Notification</h3>
+            <p>解析結果に特定のパターンが含まれた際、OS通知を出し、ログに記録する設定です。</p>
+          </div>
+        </div>
+      </section>
+
+      <!-- Operation Methods -->
+      <section id="operation">
+        <h2>基本的な操作方法</h2>
+        <div class="step">
+          <div class="step-content">
+            <h3>1. 解析範囲（クロップ）の設定</h3>
+            <p>
+              画面中央に表示される青枠をドラッグして、解析したい範囲を指定します。枠の右下を掴むことでサイズ変更も可能です。
+            </p>
+            <img src="images/startup.png" alt="Startup Screen" class="screenshot" />
+          </div>
+        </div>
+
+        <div class="step">
+          <div class="step-content">
+            <h3>2. モデルのロード</h3>
+            <p>
+              初回起動時やモデル変更時は「Load
+              Model」をクリックしてください。WebGPU対応のモデルがHugging
+              Faceよりダウンロードされ、ブラウザ（Electron）のキャッシュに保存されます。
+            </p>
+            <p style="font-size: 0.9rem; color: #a4b0be">
+              ※ダウンロード完了後は、インターネットに接続されていない環境（オフライン）でも解析を行うことが可能です。
+            </p>
+          </div>
+        </div>
+
+        <div class="step">
+          <div class="step-content">
+            <h3>3. 解析の実行</h3>
+            <p>
+              <strong>Capture & Analyze</strong> をクリックすると一回限りの解析を行います。<strong
+                >Start Live Analysis</strong
+              >
+              を押すと、設定した間隔で継続的な解析が行われます。
+            </p>
+            <div
+              style="
+                display: flex;
+                gap: 1.5rem;
+                margin: 2rem 0;
+                flex-wrap: wrap;
+                align-items: start;
+              "
+            >
+              <div style="flex: 1; min-width: 300px">
+                <div
+                  style="
+                    font-size: 0.85rem;
+                    color: var(--primary-color);
+                    font-weight: bold;
+                    margin-bottom: 0.5rem;
+                    text-align: center;
+                  "
+                >
+                  Capture & Analyze
+                </div>
+                <img
+                  src="images/capture.png"
+                  alt="Capture and Analyze"
+                  class="screenshot"
+                  style="margin-top: 0"
+                />
+              </div>
+              <div style="flex: 1; min-width: 300px">
+                <div
+                  style="
+                    font-size: 0.85rem;
+                    color: var(--primary-color);
+                    font-weight: bold;
+                    margin-bottom: 0.5rem;
+                    text-align: center;
+                  "
+                >
+                  Live Analysis
+                </div>
+                <img
+                  src="images/live-analysis.png"
+                  alt="Live Analysis"
+                  class="screenshot"
+                  style="margin-top: 0"
+                />
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+    </main>
+
+    <footer
+      style="padding: 4rem 10%; text-align: center; border-top: 1px solid var(--glass-border)"
+    >
+      <p>© 2026 GemmaSight - Powering Intelligence Everywhere.</p>
+    </footer>
+  </body>
 </html>
