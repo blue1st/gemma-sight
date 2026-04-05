@@ -161,6 +161,23 @@ h2 {
   margin-bottom: -1rem;
 }
 
+.screenshot {
+  width: 100%;
+  max-width: 800px;
+  height: auto;
+  border-radius: 12px;
+  border: 1px solid var(--glass-border);
+  box-shadow: 0 10px 30px rgba(0,0,0,0.3);
+  margin: 1.5rem auto;
+  display: block;
+}
+
+.screenshot-container {
+  display: flex;
+  justify-content: center;
+  width: 100%;
+}
+
 /* Code block */
 code {
   background: #1e293b;
