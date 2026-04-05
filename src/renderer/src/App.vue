@@ -207,6 +207,10 @@ function stopFrameCapture(): void {
   }
 }
 
+function clearFrameBuffer(): void {
+  frameBuffer.value = []
+}
+
 watch(
   [videoFrameInterval, useVideoInput],
   () => {
@@ -533,7 +537,12 @@ async function selectVideoFile(): Promise<void> {
   const filePath = await window.electron.ipcRenderer.invoke('select-video-file')
   if (!filePath) return
 
+  clearFrameBuffer()
   videoFilePath.value = filePath
+
+  // Default to using video audio when a video is selected
+  includeAudio.value = true
+  selectedAudioSourceId.value = AUDIO_SOURCE_VIDEO
 
   const video = videoRef.value
   if (!video) return
@@ -605,10 +614,9 @@ async function onSourceTypeChange(): Promise<void> {
     selectedSourceId.value = webcamSources.value[0].deviceId
     startStream()
   } else if (sourceType.value === 'video') {
-    // When switching to video, automatically suggest video audio
-    if (includeAudio.value) {
-      selectedAudioSourceId.value = AUDIO_SOURCE_VIDEO
-    }
+    // When switching to video, automatically enable audio and suggest video audio
+    includeAudio.value = true
+    selectedAudioSourceId.value = AUDIO_SOURCE_VIDEO
   }
 }
 
@@ -880,19 +888,14 @@ onUnmounted(() => {
           </div>
         </div>
 
-        <!-- Row 2: Audio Source + Use Audio -->
+        <!-- Row 2: Use Audio + Audio Source -->
         <div class="control-row">
           <div class="control-row-left">
             <div class="control-group">
-              <label>Audio Source</label>
-              <select v-model="selectedAudioSourceId">
-                <option v-if="sourceType === 'video'" :value="AUDIO_SOURCE_VIDEO">
-                  Video Audio (Internal)
-                </option>
-                <option v-for="a in audioSources" :key="a.deviceId" :value="a.deviceId">
-                  {{ a.label || `Audio ${a.deviceId}` }}
-                </option>
-              </select>
+              <label class="checkbox-label">
+                <input v-model="includeAudio" type="checkbox" />
+                Use Audio
+              </label>
               <div v-if="includeAudio" class="volume-meter" title="Current Audio Level">
                 <div
                   class="volume-level"
@@ -902,14 +905,23 @@ onUnmounted(() => {
                   }"
                 ></div>
               </div>
-              <div v-if="audioStatus" class="audio-status-label">{{ audioStatus }}</div>
+              <div v-if="includeAudio && audioStatus" class="audio-status-label">
+                {{ audioStatus }}
+              </div>
             </div>
           </div>
           <div class="control-row-right">
-            <label class="checkbox-label">
-              <input v-model="includeAudio" type="checkbox" />
-              Use Audio
-            </label>
+            <div class="control-group">
+              <label>Audio Source</label>
+              <select v-model="selectedAudioSourceId" :disabled="!includeAudio">
+                <option v-if="sourceType === 'video'" :value="AUDIO_SOURCE_VIDEO">
+                  Video Audio (Internal)
+                </option>
+                <option v-for="a in audioSources" :key="a.deviceId" :value="a.deviceId">
+                  {{ a.label || `Audio ${a.deviceId}` }}
+                </option>
+              </select>
+            </div>
           </div>
         </div>
 
@@ -977,6 +989,13 @@ onUnmounted(() => {
                 ></div>
               </div>
               <span class="buffer-count">{{ frameBuffer.length }} / {{ videoFrameCount }}</span>
+              <button
+                class="buffer-clear-btn"
+                title="Clear current frame buffer"
+                @click="clearFrameBuffer"
+              >
+                Clear
+              </button>
             </div>
           </div>
         </div>
@@ -1411,6 +1430,17 @@ body {
 .buffer-count {
   font-family: monospace;
   min-width: 45px;
+}
+.buffer-clear-btn {
+  padding: 2px 8px !important;
+  font-size: 10px !important;
+  background: #6c757d !important;
+  color: white;
+  border-radius: 4px;
+  cursor: pointer;
+}
+.buffer-clear-btn:hover {
+  background: #5a6268 !important;
 }
 .video-mode-overlay {
   position: absolute;
