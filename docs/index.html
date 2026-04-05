@@ -322,15 +322,15 @@
           // Simulation Constants
           const CAPTURE_INTERVAL_DIST = 60
           const BATCH_SIZE = isVideoMode ? 4 : 1
+          const ANALYSIS_DIST = 100 // Distance moved during analysis
           const LIVE_INTERVAL_DIST = isVideoMode ? 220 : 300
           const SPEED = 1.6
 
           let playbackX = 0
           let captures = []
-          let state = 'CAPTURING'
+          let state = 'CAPTURING' // CAPTURING, ANALYZING, WAITING
           let capturesInBatch = 0
           let nextCaptureX = 0
-          let analysisFlash = 0
 
           function draw() {
             const dpr = window.devicePixelRatio || 1
@@ -370,20 +370,20 @@
               nextCaptureX = playbackX + CAPTURE_INTERVAL_DIST
 
               if (capturesInBatch === BATCH_SIZE) {
-                state = 'WAITING'
-                nextCaptureX = playbackX + LIVE_INTERVAL_DIST
+                state = 'ANALYZING'
+                nextCaptureX = playbackX + ANALYSIS_DIST
                 capturesInBatch = 0
-                analysisFlash = 80
 
                 const currentBatch = captures.slice(-BATCH_SIZE)
                 currentBatch.forEach((c) => (c.analyzing = true))
               }
+            } else if (state === 'ANALYZING' && playbackX >= nextCaptureX) {
+              state = 'WAITING'
+              nextCaptureX = playbackX + LIVE_INTERVAL_DIST
             } else if (state === 'WAITING' && playbackX >= nextCaptureX) {
               state = 'CAPTURING'
               nextCaptureX = playbackX + 5
             }
-
-            if (analysisFlash > 0) analysisFlash--
 
             // ---- Draw Track ----
             ctx.strokeStyle = 'rgba(255,255,255,0.05)'
@@ -405,8 +405,9 @@
             Object.keys(batchGroups).forEach((batchId) => {
               const group = batchGroups[batchId]
               const batchIdx = parseInt(batchId)
-              // Only highlight if it's the very last batch and we are in analysis flash
-              const isCurrentAnalyzing = group[0].analyzing && analysisFlash > 0 && batchIdx === totalBatches - 1
+              // Highlight only if it's the very last batch and we are in analysis phase
+              const isCurrentAnalyzing =
+                group[0].analyzing && state === 'ANALYZING' && batchIdx === totalBatches - 1
 
               group.forEach((c) => {
                 ctx.strokeStyle = isCurrentAnalyzing ? colors.accent : colors.dim
@@ -446,7 +447,7 @@
                 ctx.textAlign = 'left'
               } else if (group.length === BATCH_SIZE && BATCH_SIZE === 1) {
                 // Label for single capture
-                if (isCurrentAnalyzing) {
+                if (state === 'ANALYZING' && batchIdx === totalBatches - 1) {
                   ctx.fillStyle = colors.accent
                   ctx.font = 'bold 10px Inter'
                   ctx.fillText('Analyzing Screen...', group[0].x - 40, trackY - 45)
@@ -472,7 +473,11 @@
             ctx.setLineDash([])
 
             // ---- Status Text ----
-            if (state === 'WAITING') {
+            if (state === 'ANALYZING') {
+              ctx.fillStyle = colors.accent
+              ctx.font = 'bold 14px Inter'
+              ctx.fillText('ANALYZING BATCH...', margin + playbackX + 15, trackY + 100)
+            } else if (state === 'WAITING') {
               ctx.fillStyle = colors.secondary
               ctx.font = 'bold 13px Inter'
               ctx.fillText('LIVE INTERVAL (PAUSE CAPTURE)', margin + playbackX + 15, trackY - 110)
@@ -512,6 +517,7 @@
 
           draw()
         }
+
 
         setupCanvas('mechanismCanvasImage', false)
         setupCanvas('mechanismCanvasVideo', true)
