@@ -153,7 +153,7 @@ self.onmessage = async (e: MessageEvent) => {
 
       const decoded = processor.batch_decode(
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        outputs.slice(null, [(inputs as any).input_ids.dims.at(-1), null]),
+        outputs.slice(null, [(inputs as any).input_ids.dims.at(-1), null]) as any,
         { skip_special_tokens: true }
       )
       self.postMessage({ type: 'generated', payload: decoded[0] })
