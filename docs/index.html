@@ -24,6 +24,7 @@
         <a href="#requirements">動作要件</a>
         <a href="#install">インストール</a>
         <a href="#forms">各項目解説</a>
+        <a href="#mechanism">解析の仕組み</a>
         <a href="#operation">操作方法</a>
         <a
           href="https://github.com/blue1st/gemma-sight"
@@ -297,6 +298,230 @@
             <p>解析結果に特定のパターンが含まれた際、OS通知を出し、ログに記録する設定です。</p>
           </div>
         </div>
+      </section>
+
+      <!-- Analysis Mechanism Animation -->
+      <section
+        id="mechanism"
+        style="background: rgba(255, 255, 255, 0.01); border-bottom: 1px solid var(--glass-border)"
+      >
+        <h2>ライブ解析の仕組み</h2>
+        <p style="text-align: center; color: #a4b0be; max-width: 800px; margin: 0 auto 2rem">
+          <strong>Capture Interval</strong>（撮影周期）でフレームをバッファに貯め、
+          <strong>Analysis Frames</strong>（解析フレーム数）だけ揃った状態でAIが解析を実行します。
+          次の解析までは <strong>Live Interval</strong>（解析待機）分だけ待機します。
+        </p>
+
+        <div
+          class="canvas-container"
+          style="
+            background: #0a0f1d;
+            border-radius: 20px;
+            border: 1px solid var(--glass-border);
+            padding: 2rem;
+            max-width: 900px;
+            margin: 0 auto;
+            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.5);
+            overflow: hidden;
+          "
+        >
+          <canvas id="mechanismCanvas" style="width: 100%; height: 350px"></canvas>
+        </div>
+
+        <script>
+          const canvas = document.getElementById('mechanismCanvas')
+          const ctx = canvas.getContext('2d')
+
+          const colors = {
+            primary: '#3867d6',
+            secondary: '#8854d0',
+            accent: '#2ed573',
+            bg: '#0a0f1d',
+            text: '#f1f2f6',
+            dim: '#a4b0be'
+          }
+
+          // Simulation Constants
+          const CAPTURE_INTERVAL_DIST = 60
+          const BATCH_SIZE = 4
+          const LIVE_INTERVAL_DIST = 220
+          const SPEED = 1.6
+
+          // State
+          let playbackX = 0
+          let captures = [] // {x, y, batch, analyzing}
+          let state = 'CAPTURING'
+          let capturesInBatch = 0
+          let nextCaptureX = 0
+          let analysisFlash = 0
+
+          function draw() {
+            const dpr = window.devicePixelRatio || 1
+            const rect = canvas.getBoundingClientRect()
+            if (canvas.width !== rect.width * dpr || canvas.height !== rect.height * dpr) {
+              canvas.width = rect.width * dpr
+              canvas.height = rect.height * dpr
+            }
+            ctx.scale(dpr, dpr)
+            const w = rect.width
+            const h = rect.height
+            ctx.clearRect(0, 0, w, h)
+
+            const margin = 80
+            const trackY = h / 2 + 10
+            const trackWidth = w - margin * 2
+
+            // ---- Background UI ----
+            ctx.fillStyle = colors.dim
+            ctx.font = 'bold 14px Inter'
+            ctx.fillText('Live Analysis Stream', margin, trackY - 120)
+
+            // ---- Update Logic ----
+            playbackX += SPEED
+            if (playbackX > trackWidth) {
+              playbackX = 0
+              captures = []
+              capturesInBatch = 0
+              nextCaptureX = 0
+              state = 'CAPTURING'
+            }
+
+            if (state === 'CAPTURING' && playbackX >= nextCaptureX) {
+              captures.push({
+                x: margin + playbackX,
+                y: trackY,
+                batch: Math.floor(captures.length / BATCH_SIZE),
+                analyzing: false
+              })
+              capturesInBatch++
+              nextCaptureX = playbackX + CAPTURE_INTERVAL_DIST
+
+              if (capturesInBatch === BATCH_SIZE) {
+                state = 'WAITING'
+                nextCaptureX = playbackX + LIVE_INTERVAL_DIST
+                capturesInBatch = 0
+                analysisFlash = 80 
+                
+                const currentBatch = captures.slice(-BATCH_SIZE)
+                currentBatch.forEach(c => c.analyzing = true)
+              }
+            } else if (state === 'WAITING' && playbackX >= nextCaptureX) {
+              state = 'CAPTURING'
+              nextCaptureX = playbackX + 5
+            }
+
+            if (analysisFlash > 0) analysisFlash--
+
+            // ---- Draw Track ----
+            ctx.strokeStyle = 'rgba(255,255,255,0.05)'
+            ctx.lineWidth = 4
+            ctx.beginPath()
+            ctx.moveTo(margin, trackY)
+            ctx.lineTo(margin + trackWidth, trackY)
+            ctx.stroke()
+
+            // ---- Draw Captures & Brackets ----
+            const batchGroups = {}
+            captures.forEach(c => {
+               if (!batchGroups[c.batch]) batchGroups[c.batch] = []
+               batchGroups[c.batch].push(c)
+            })
+
+            Object.keys(batchGroups).forEach(batchId => {
+              const group = batchGroups[batchId]
+              const isAnalyzing = group[0].analyzing && analysisFlash > 0
+              
+              group.forEach(c => {
+                // Tick
+                ctx.strokeStyle = isAnalyzing ? colors.accent : colors.dim
+                ctx.lineWidth = 2
+                ctx.beginPath()
+                ctx.moveTo(c.x, trackY - 10)
+                ctx.lineTo(c.x, trackY + 10)
+                ctx.stroke()
+
+                // Camera
+                ctx.font = '22px serif'
+                ctx.fillText('📷', c.x - 11, trackY - 20)
+              })
+
+              // Horizontal Bracket for completed batch
+              if (group.length === BATCH_SIZE) {
+                const startX = group[0].x - 15
+                const endX = group[BATCH_SIZE-1].x + 15
+                const bracketY = trackY - 55
+
+                ctx.strokeStyle = isAnalyzing ? colors.accent : 'rgba(255,255,255,0.2)'
+                ctx.lineWidth = 1
+                ctx.beginPath()
+                ctx.moveTo(startX, bracketY + 5)
+                ctx.lineTo(startX, bracketY)
+                ctx.lineTo(endX, bracketY)
+                ctx.lineTo(endX, bracketY + 5)
+                ctx.stroke()
+
+                ctx.fillStyle = isAnalyzing ? colors.accent : colors.dim
+                ctx.font = isAnalyzing ? 'bold 10px Inter' : '10px Inter'
+                ctx.textAlign = 'center'
+                ctx.fillText(`Analysis Frames (${BATCH_SIZE} items)`, (startX + endX) / 2, bracketY - 10)
+                ctx.textAlign = 'left'
+              }
+            })
+
+            // ---- Playhead ----
+            ctx.fillStyle = colors.primary
+            ctx.beginPath()
+            ctx.moveTo(margin + playbackX, trackY - 8)
+            ctx.lineTo(margin + playbackX + 12, trackY)
+            ctx.lineTo(margin + playbackX, trackY + 8)
+            ctx.fill()
+            
+            ctx.strokeStyle = colors.primary
+            ctx.lineWidth = 1
+            ctx.setLineDash([2, 4])
+            ctx.beginPath()
+            ctx.moveTo(margin + playbackX, trackY - 100)
+            ctx.lineTo(margin + playbackX, trackY + 80)
+            ctx.stroke()
+            ctx.setLineDash([])
+
+            // ---- Status Text ----
+            if (state === 'WAITING') {
+                ctx.fillStyle = colors.secondary
+                ctx.font = 'bold 13px Inter'
+                ctx.fillText('LIVE INTERVAL (PAUSE CAPTURE)', margin + playbackX + 15, trackY - 110)
+                
+                ctx.fillStyle = colors.dim
+                ctx.font = '10px Inter'
+                ctx.fillText('Stream continues, waiting for next cycle...', margin + playbackX + 15, trackY - 95)
+            } else if (analysisFlash > 40) {
+                ctx.fillStyle = colors.accent
+                ctx.font = 'bold 14px Inter'
+                ctx.fillText('BATCH READY - ANALYZING...', margin, trackY + 110)
+            }
+
+            // Legend (Adjusted positions)
+            const legendY = h - 30
+            const legendX1 = margin
+            const legendX2 = margin + 250
+
+            ctx.fillStyle = colors.dim
+            ctx.font = '11px Inter'
+            ctx.fillText('Capture Interval', legendX1, legendY)
+            ctx.strokeStyle = colors.dim
+            ctx.strokeRect(legendX1 - 20, legendY - 8, 15, 1)
+
+            ctx.fillText('Live Interval (Waiting Space)', legendX2, legendY)
+            ctx.strokeStyle = colors.secondary
+            ctx.setLineDash([2, 2])
+            ctx.beginPath(); ctx.moveTo(legendX2 - 40, legendY - 4); ctx.lineTo(legendX2 - 10, legendY - 4); ctx.stroke()
+            ctx.setLineDash([])
+
+            requestAnimationFrame(draw)
+          }
+
+          draw()
+        </script>
       </section>
 
       <!-- Operation Methods -->
