@@ -46,12 +46,13 @@
       <div class="step">
         <div class="step-content">
           <div class="step-number">02</div>
-          <h3>アプリケーションの起動</h3>
-          <p>ダウンロードしたアーカイブを展開し、アプリケーションを実行します。</p>
+          <h3>アプリケーションのインストール</h3>
+          <p>ダウンロードしたアーカイブを展開、またはインストーラーを実行します。</p>
           <ul>
-            <li><strong>macOS (.dmg / .zip)</strong>: フォルダに展開後、アプリケーションを起動してください。</li>
-            <li><strong>Windows (.exe)</strong>: インストーラーまたは実行ファイルを開いてください。</li>
+            <li><strong>macOS (.dmg)</strong>: DMGファイルを開き、アイコンを「Applications」フォルダへドラッグ＆ドロップしてください。</li>
+            <li><strong>Windows (.exe)</strong>: インストーラーまたは実行ファイルを実行してください。</li>
           </ul>
+          <img src="images/mac-install.png" alt="macOS Installation" class="screenshot" style="max-width: 500px;">
         </div>
       </div>
 
@@ -59,8 +60,11 @@
         <div class="step-content">
           <div class="step-number">03</div>
           <h3>セキュリティ許可 (macOS)</h3>
-          <p>macOSの場合、右クリック（またはControlキーを押しながらクリック）して「開く」を選択し、初回起動の許可が必要な場合があります。</p>
-          <p>また、アプリケーションがブロックされる場合は、システム設定の <strong>「プライバシーとセキュリティ」</strong> ＞ <strong>「セキュリティ」</strong> セクションを確認し、「このまま開く」を選択して実行を許可してください。</p>
+          <p>macOSの場合、開発元が未確認のため開けないという警告が表示される場合があります。その場合は、システム設定の <strong>「プライバシーとセキュリティ」</strong> を開き、 <strong>「セキュリティ」</strong> セクションで「このまま開く」を選択してください。</p>
+          <div style="display: flex; gap: 1.5rem; flex-wrap: wrap; justify-content: center; align-items: start; margin-top: 1.5rem;">
+            <img src="images/mac-security-alert.png" alt="Security Alert" class="screenshot" style="max-width: 260px; margin: 0;">
+            <img src="images/mac-security-setting.png" alt="Security Setting" class="screenshot" style="max-width: 500px; margin: 0;">
+          </div>
         </div>
       </div>
 
@@ -68,9 +72,10 @@
         <div class="step-content">
           <div class="step-number">04</div>
           <h3>アクセス権限の許可 (macOS)</h3>
-          <p>画面解析や音声解析を正常に行うために、初回実行時に <strong>「画面収録」</strong> および <strong>「システムオーディオ録音（またはマイク）」</strong> の許可が求められます。OSのダイアログに従って「確認」や「許可」を選択してください。</p>
+          <p>画面解析や音声解析を正常に行うために、初回実行時に <strong>「画面収録」</strong> および <strong>「システムオーディオ録音（またはマイク）」</strong> の許可が求められます。</p>
+          <img src="images/mac-audio-alert.png" alt="Audio Permission Alert" class="screenshot" style="max-width: 460px;">
           <p>正しく動作しない場合は、システム設定の <strong>「プライバシーとセキュリティ」</strong> 内の各項目で <strong>GemmaSight</strong> にチェックが入っているか確認してください。</p>
-          <img src="images/mac-audio-setup.png" alt="Mac System Audio Settings" class="screenshot">
+          <img src="images/mac-audio-setup.png" alt="Mac System Audio Settings" class="screenshot" style="max-width: 600px;">
         </div>
       </div>
     </section>
