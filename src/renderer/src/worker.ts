@@ -40,9 +40,7 @@ self.onmessage = async (e: MessageEvent) => {
         throw new Error('Model or processor not loaded')
       }
       const { promptText, dataUrls, audioData, samplingRate } = payload
-      const images = await Promise.all(
-        dataUrls.map((url: string) => RawImage.fromURL(url))
-      )
+      const images = await Promise.all(dataUrls.map((url: string) => RawImage.fromURL(url)))
 
       if (audioData) {
         const sum = audioData.reduce((acc: number, val: number) => acc + Math.abs(val), 0)
@@ -54,9 +52,9 @@ self.onmessage = async (e: MessageEvent) => {
       }
 
       // Construct content following the suggested pattern: Media -> Audio -> Text
-      const content: any[] = []
-      
-      // Use individual image placeholders if multiple frames are provided, 
+      const content: Array<{ type: string; text?: string }> = []
+
+      // Use individual image placeholders if multiple frames are provided,
       // as some templates/versions of transformers.js might not expand 'type: video' correctly.
       if (images.length > 0) {
         for (let i = 0; i < images.length; i++) {
@@ -77,23 +75,31 @@ self.onmessage = async (e: MessageEvent) => {
         }
       ]
 
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      let prompt = await (processor as any).apply_chat_template(messages, {
+      let prompt = (await (
+        processor as unknown as {
+          apply_chat_template: (
+            messages: Array<{ role: string; content: unknown }>,
+            options: { add_generation_prompt: boolean; tokenize: false }
+          ) => Promise<string>
+        }
+      ).apply_chat_template(messages, {
         add_generation_prompt: true,
         tokenize: false
-      })
+      })) as string
 
       console.log('Template output:', prompt)
 
-      // Ensure media placeholders are present. 
+      // Ensure media placeholders are present.
       // We look for common markers like <image>, <audio>, <video>, or [IMAGE]
       // Handle special tokens for media. Some tokenizers use unique tags.
-      const imageTag = (processor as any).image_token || '<image>'
-      const audioTag = (processor as any).audio_token || '<audio>'
+      const imageTag = (processor as unknown as { image_token?: string }).image_token || '<image>'
+      const audioTag = (processor as unknown as { audio_token?: string }).audio_token || '<audio>'
       const videoTag = '<video>'
 
-      const hasImageToken = prompt.includes(imageTag) || prompt.includes('<boi>') || prompt.includes('[IMAGE]')
-      const hasAudioToken = prompt.includes(audioTag) || prompt.includes('<boa>') || prompt.includes('[AUDIO]')
+      const hasImageToken =
+        prompt.includes(imageTag) || prompt.includes('<boi>') || prompt.includes('[IMAGE]')
+      const hasAudioToken =
+        prompt.includes(audioTag) || prompt.includes('<boa>') || prompt.includes('[AUDIO]')
       const hasVideoToken = prompt.includes(videoTag) || prompt.includes('[VIDEO]')
 
       if (images.length > 0 && !hasImageToken && !hasVideoToken) {
@@ -113,7 +119,14 @@ self.onmessage = async (e: MessageEvent) => {
 
       console.log('Final prompt for tokenizer:', prompt)
 
-      const inputs = await (processor as any)(prompt, images, audioData, {
+      const inputs = await (
+        processor as unknown as (
+          text: string,
+          images: unknown,
+          audio: unknown,
+          options: { sampling_rate: number }
+        ) => Promise<Record<string, unknown>>
+      )(prompt, images, audioData, {
         sampling_rate: samplingRate
       })
 
@@ -127,13 +140,16 @@ self.onmessage = async (e: MessageEvent) => {
         }
       })
 
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const outputs = await (model as any).generate({
+      const outputs = (await (
+        model as unknown as {
+          generate: (args: unknown) => Promise<{ slice: (...args: unknown[]) => unknown }>
+        }
+      ).generate({
         ...inputs,
         max_new_tokens: 512,
         do_sample: false,
         streamer
-      })
+      })) as { slice: (...args: unknown[]) => unknown }
 
       const decoded = processor.batch_decode(
         // eslint-disable-next-line @typescript-eslint/no-explicit-any

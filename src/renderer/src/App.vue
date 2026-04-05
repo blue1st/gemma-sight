@@ -198,36 +198,40 @@ function stopFrameCapture(): void {
   }
 }
 
-watch([videoFrameInterval, useVideoInput], () => {
-  if (useVideoInput.value) {
-    startFrameCapture()
-    // Auto-update prompt if it matches a default image prompt
-    if (promptText.value === DEFAULT_PROMPT) {
-      promptText.value = DEFAULT_VIDEO_PROMPT
-    } else if (promptText.value === DEFAULT_MULTIMODAL_PROMPT) {
-      promptText.value = DEFAULT_MULTIMODAL_VIDEO_PROMPT
+watch(
+  [videoFrameInterval, useVideoInput],
+  () => {
+    if (useVideoInput.value) {
+      startFrameCapture()
+      // Auto-update prompt if it matches a default image prompt
+      if (promptText.value === DEFAULT_PROMPT) {
+        promptText.value = DEFAULT_VIDEO_PROMPT
+      } else if (promptText.value === DEFAULT_MULTIMODAL_PROMPT) {
+        promptText.value = DEFAULT_MULTIMODAL_VIDEO_PROMPT
+      }
+      // Update live interval for video mode efficiency
+      if (samplingInterval.value === DEFAULT_INTERVAL) {
+        samplingInterval.value = DEFAULT_VIDEO_LIVE_INTERVAL
+      }
+    } else {
+      stopFrameCapture()
+      frameBuffer.value = []
+      // Auto-update prompt if it matches a default video prompt
+      if (promptText.value === DEFAULT_VIDEO_PROMPT) {
+        promptText.value = DEFAULT_PROMPT
+      } else if (promptText.value === DEFAULT_MULTIMODAL_VIDEO_PROMPT) {
+        promptText.value = DEFAULT_MULTIMODAL_PROMPT
+      }
+      // Restore live interval
+      if (samplingInterval.value === DEFAULT_VIDEO_LIVE_INTERVAL) {
+        samplingInterval.value = DEFAULT_INTERVAL
+      }
     }
-    // Update live interval for video mode efficiency
-    if (samplingInterval.value === DEFAULT_INTERVAL) {
-      samplingInterval.value = DEFAULT_VIDEO_LIVE_INTERVAL
-    }
-  } else {
-    stopFrameCapture()
-    frameBuffer.value = []
-    // Auto-update prompt if it matches a default video prompt
-    if (promptText.value === DEFAULT_VIDEO_PROMPT) {
-      promptText.value = DEFAULT_PROMPT
-    } else if (promptText.value === DEFAULT_MULTIMODAL_VIDEO_PROMPT) {
-      promptText.value = DEFAULT_MULTIMODAL_PROMPT
-    }
-    // Restore live interval
-    if (samplingInterval.value === DEFAULT_VIDEO_LIVE_INTERVAL) {
-      samplingInterval.value = DEFAULT_INTERVAL
-    }
+  },
+  {
+    immediate: true
   }
-}, {
-  immediate: true
-})
+)
 
 const AUDIO_SOURCE_VIDEO = '__video_audio__'
 let videoSourceNode: MediaElementAudioSourceNode | null = null
