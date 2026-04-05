@@ -12,6 +12,7 @@ files:
 asarUnpack:
   - resources/**
 win:
+  icon: build/icon.ico
   executableName: gemmasight
   target:
     - target: nsis
@@ -23,8 +24,14 @@ nsis:
   shortcutName: ${productName}
   uninstallDisplayName: ${productName}
   createDesktopShortcut: always
+  installerIcon: build/icon.ico
+  uninstallerIcon: build/icon.ico
+  installerHeaderIcon: build/icon.ico
 mac:
+  icon: build/icon.icns
+  entitlements: build/entitlements.mac.plist
   entitlementsInherit: build/entitlements.mac.plist
+  hardenedRuntime: true
   target:
     - target: dmg
       arch:
@@ -37,8 +44,10 @@ mac:
     - NSDownloadsFolderUsageDescription: Application requests access to the user's Downloads folder.
   notarize: false
 dmg:
+  icon: build/icon.icns
   artifactName: ${name}-${version}.${ext}
 linux:
+  icon: build/icon.png
   target:
     - AppImage
     - snap
@@ -46,6 +55,7 @@ linux:
   maintainer: electronjs.org
   category: Utility
 appImage:
+  icon: build/icon.png
   artifactName: ${name}-${version}.${ext}
 npmRebuild: false
 publish:
