@@ -400,12 +400,16 @@
               batchGroups[c.batch].push(c)
             })
 
+            const totalBatches = Math.ceil(captures.length / BATCH_SIZE)
+
             Object.keys(batchGroups).forEach((batchId) => {
               const group = batchGroups[batchId]
-              const isAnalyzing = group[0].analyzing && analysisFlash > 0
+              const batchIdx = parseInt(batchId)
+              // Only highlight if it's the very last batch and we are in analysis flash
+              const isCurrentAnalyzing = group[0].analyzing && analysisFlash > 0 && batchIdx === totalBatches - 1
 
               group.forEach((c) => {
-                ctx.strokeStyle = isAnalyzing ? colors.accent : colors.dim
+                ctx.strokeStyle = isCurrentAnalyzing ? colors.accent : colors.dim
                 ctx.lineWidth = 2
                 ctx.beginPath()
                 ctx.moveTo(c.x, trackY - 10)
@@ -422,7 +426,7 @@
                 const endX = group[BATCH_SIZE - 1].x + 15
                 const bracketY = trackY - 55
 
-                ctx.strokeStyle = isAnalyzing ? colors.accent : 'rgba(255,255,255,0.2)'
+                ctx.strokeStyle = isCurrentAnalyzing ? colors.accent : 'rgba(255,255,255,0.2)'
                 ctx.lineWidth = 1
                 ctx.beginPath()
                 ctx.moveTo(startX, bracketY + 5)
@@ -431,8 +435,8 @@
                 ctx.lineTo(endX, bracketY + 5)
                 ctx.stroke()
 
-                ctx.fillStyle = isAnalyzing ? colors.accent : colors.dim
-                ctx.font = isAnalyzing ? 'bold 10px Inter' : '10px Inter'
+                ctx.fillStyle = isCurrentAnalyzing ? colors.accent : colors.dim
+                ctx.font = isCurrentAnalyzing ? 'bold 10px Inter' : '10px Inter'
                 ctx.textAlign = 'center'
                 ctx.fillText(
                   `Analysis Frames (${BATCH_SIZE} items)`,
@@ -442,7 +446,7 @@
                 ctx.textAlign = 'left'
               } else if (group.length === BATCH_SIZE && BATCH_SIZE === 1) {
                 // Label for single capture
-                if (isAnalyzing) {
+                if (isCurrentAnalyzing) {
                   ctx.fillStyle = colors.accent
                   ctx.font = 'bold 10px Inter'
                   ctx.fillText('Analyzing Screen...', group[0].x - 40, trackY - 45)
