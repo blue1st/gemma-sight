@@ -7,13 +7,21 @@ interface ScreenSource {
   display_id: string
 }
 
+const includeAudio = ref(false)
+const useVideoInput = ref(true) // Default to true as it's the requested upgrade
+const videoFrameCount = ref(8)
+const videoFrameInterval = ref(1000)
+
+const audioStatus = ref('')
+let writeIdx = 0
+let animationFrameId: number | null = null
+
 const sourceType = ref<'screen' | 'webcam' | 'video'>('screen')
 const selectedSourceId = ref<string>('')
 const selectedAudioSourceId = ref<string>('')
 const screenSources = ref<ScreenSource[]>([])
 const webcamSources = ref<MediaDeviceInfo[]>([])
 const audioSources = ref<MediaDeviceInfo[]>([])
-const includeAudio = ref(false)
 const videoRef = ref<HTMLVideoElement | null>(null)
 const videoFilePath = ref('')
 const canvasRef = ref<HTMLCanvasElement | null>(null)
@@ -41,7 +49,15 @@ const DEFAULT_PROMPT = 'Describe this image in Japanese. 1-2 sentences.'
 const DEFAULT_MULTIMODAL_PROMPT = 'Describe this image and audio in Japanese 1-2 sentences.'
 const DEFAULT_VIDEO_PROMPT = 'Describe this video in Japanese 1-2 sentences.'
 const DEFAULT_MULTIMODAL_VIDEO_PROMPT = 'Describe this video and audio in Japanese 1-2 sentences.'
-const promptText = ref(DEFAULT_PROMPT)
+const promptText = ref(
+  useVideoInput.value
+    ? includeAudio.value
+      ? DEFAULT_MULTIMODAL_VIDEO_PROMPT
+      : DEFAULT_VIDEO_PROMPT
+    : includeAudio.value
+      ? DEFAULT_MULTIMODAL_PROMPT
+      : DEFAULT_PROMPT
+)
 
 // Sampling Interval (ms)
 const DEFAULT_INTERVAL = 2000
@@ -112,17 +128,12 @@ const isStreamingToFile = ref(false)
 const streamingFilePath = ref('')
 const isStreaming = ref(false)
 const isModelLoaded = ref(false)
+const isResultDetached = ref(false)
 const resultRef = ref<HTMLPreElement | null>(null)
 let audioContext: AudioContext | null = null
 let audioStream: MediaStream | null = null
 const audioBuffer = ref<Float32Array | null>(null)
 const audioVolume = ref(0)
-const audioStatus = ref('')
-let writeIdx = 0
-let animationFrameId: number | null = null
-const useVideoInput = ref(true) // Default to true as it's the requested upgrade
-const videoFrameCount = ref(8)
-const videoFrameInterval = ref(1000)
 const frameBuffer = ref<string[]>([])
 let frameCaptureIntervalId: number | null = null
 
@@ -214,6 +225,8 @@ watch([videoFrameInterval, useVideoInput], () => {
       samplingInterval.value = DEFAULT_INTERVAL
     }
   }
+}, {
+  immediate: true
 })
 
 const AUDIO_SOURCE_VIDEO = '__video_audio__'
@@ -320,7 +333,10 @@ watch([includeAudio, selectedAudioSourceId], async () => {
 })
 
 // Auto-scroll logic
-watch(resultText, () => {
+watch(resultText, (newText) => {
+  if (isResultDetached.value) {
+    window.electron.ipcRenderer.invoke('update-result-content', newText)
+  }
   nextTick(() => {
     if (resultRef.value) {
       resultRef.value.scrollTop = resultRef.value.scrollHeight
@@ -330,6 +346,20 @@ watch(resultText, () => {
 
 function clearResult(): void {
   resultText.value = ''
+  if (isResultDetached.value) {
+    window.electron.ipcRenderer.invoke('clear-result-window')
+  }
+}
+
+async function toggleResultWindow(): Promise<void> {
+  if (isResultDetached.value) {
+    // Already detached
+    isResultDetached.value = false
+  } else {
+    isResultDetached.value = true
+    await window.electron.ipcRenderer.invoke('open-result-window')
+    window.electron.ipcRenderer.invoke('update-result-content', resultText.value)
+  }
 }
 
 let worker: Worker | null = null
@@ -534,6 +564,15 @@ onMounted(async () => {
   // Listen for clear events from the log window
   window.electron.ipcRenderer.on('notify-log-cleared', () => {
     notifyLog.value = []
+  })
+  window.electron.ipcRenderer.on('result-window-closed', () => {
+    isResultDetached.value = false
+  })
+  window.electron.ipcRenderer.on('result-window-attach-request', () => {
+    isResultDetached.value = false
+  })
+  window.electron.ipcRenderer.on('clear-result-from-window', () => {
+    clearResult()
   })
 })
 
@@ -1046,10 +1085,16 @@ onUnmounted(() => {
             <button class="save-btn" :disabled="!resultText || isLoading" @click="saveToFile">
               {{ isSaved ? 'Saved!' : 'Save' }}
             </button>
+            <button class="detach-btn" @click="toggleResultWindow">
+              {{ isResultDetached ? 'Attach' : 'Detach' }}
+            </button>
           </div>
         </div>
         <div class="result-container">
-          <pre ref="resultRef" class="result">{{ resultText }}</pre>
+          <pre v-show="!isResultDetached" ref="resultRef" class="result">{{ resultText }}</pre>
+          <div v-if="isResultDetached" class="detached-placeholder">
+            Results are shown in the detached window.
+          </div>
           <div v-if="isLoading" class="loading-indicator">Processing...</div>
         </div>
 
@@ -1512,6 +1557,33 @@ body {
 .save-btn:disabled {
   background: #ccc !important;
   cursor: not-allowed;
+}
+.detach-btn {
+  background: #4b6584 !important;
+  color: white;
+  border: none;
+  padding: 4px 10px !important;
+  font-size: 11px !important;
+  cursor: pointer;
+  border-radius: 4px;
+  font-weight: 600 !important;
+}
+.detach-btn:hover {
+  background: #3c4e62 !important;
+}
+.detached-placeholder {
+  flex: 1;
+  background: #f1f3f5;
+  border: 1px dashed #adb5bd;
+  color: #868e96;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 6px;
+  font-size: 13px;
+  font-weight: 500;
+  text-align: center;
+  padding: 20px;
 }
 .result-container {
   flex: 1;

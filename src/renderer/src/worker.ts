@@ -53,42 +53,67 @@ self.onmessage = async (e: MessageEvent) => {
         })
       }
 
-      // Construct a content list with a placeholder for each image
-      const imagePlaceholders = images.map(() => ({ type: 'image' }))
+      // Construct content following the suggested pattern: Media -> Audio -> Text
+      const content: any[] = []
+      
+      // Use individual image placeholders if multiple frames are provided, 
+      // as some templates/versions of transformers.js might not expand 'type: video' correctly.
+      if (images.length > 0) {
+        for (let i = 0; i < images.length; i++) {
+          content.push({ type: 'image' })
+        }
+      }
+
+      if (audioData) {
+        content.push({ type: 'audio' })
+      }
+
+      content.push({ type: 'text', text: promptText })
+
       const messages = [
         {
           role: 'user',
-          content: [
-            ...imagePlaceholders,
-            ...(audioData ? [{ type: 'audio' }] : []),
-            { type: 'text', text: promptText }
-          ]
+          content
         }
       ]
 
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       let prompt = await (processor as any).apply_chat_template(messages, {
-        add_generation_prompt: true
+        add_generation_prompt: true,
+        tokenize: false
       })
 
-      console.log('Generated prompt:', prompt)
+      console.log('Template output:', prompt)
 
-      // Manual fallback insertion if template skips them (some templates only support text)
-      if (audioData && !prompt.includes('<audio>') && !prompt.includes('<boa>')) {
-        console.warn('Audio marker missing in generated prompt, adding manually.')
-        if (prompt.includes('<image>')) {
-          // If multiple images are present, find the last one to attach audio
-          // This is a naive attempt; Gemma 4 usually handles this in the template.
-          prompt = prompt.replace(/<image>\s*$/, '<image><audio>')
-        } else if (prompt.includes('<boi>')) {
-          prompt = prompt.replace('<eoi>', '<eoi><audio>')
+      // Ensure media placeholders are present. 
+      // We look for common markers like <image>, <audio>, <video>, or [IMAGE]
+      // Handle special tokens for media. Some tokenizers use unique tags.
+      const imageTag = (processor as any).image_token || '<image>'
+      const audioTag = (processor as any).audio_token || '<audio>'
+      const videoTag = '<video>'
+
+      const hasImageToken = prompt.includes(imageTag) || prompt.includes('<boi>') || prompt.includes('[IMAGE]')
+      const hasAudioToken = prompt.includes(audioTag) || prompt.includes('<boa>') || prompt.includes('[AUDIO]')
+      const hasVideoToken = prompt.includes(videoTag) || prompt.includes('[VIDEO]')
+
+      if (images.length > 0 && !hasImageToken && !hasVideoToken) {
+        console.warn(`Media tokens missing in prompt, prefixing with ${images.length}x ${imageTag}`)
+        const placeholders = imageTag.repeat(images.length)
+        prompt = prompt.replace(/(<start_of_turn>user\s*)/, `$1\n${placeholders}\n`)
+      }
+
+      if (audioData && !hasAudioToken) {
+        console.warn(`Audio token missing in prompt, prefixing with ${audioTag}`)
+        if (prompt.includes(imageTag)) {
+          prompt = prompt.replace(imageTag, `${imageTag}${audioTag}`)
         } else {
-          prompt = '<audio>' + prompt
+          prompt = prompt.replace(/(<start_of_turn>user\s*)/, `$1\n${audioTag}\n`)
         }
       }
 
-      const inputs = await processor(prompt, images, audioData, {
-        add_special_tokens: false,
+      console.log('Final prompt for tokenizer:', prompt)
+
+      const inputs = await (processor as any)(prompt, images, audioData, {
         sampling_rate: samplingRate
       })
 

@@ -1,9 +1,19 @@
-import { app, shell, BrowserWindow, ipcMain, desktopCapturer, dialog, protocol, nativeImage } from 'electron'
+import {
+  app,
+  shell,
+  BrowserWindow,
+  ipcMain,
+  desktopCapturer,
+  dialog,
+  protocol,
+  nativeImage
+} from 'electron'
 import { join } from 'path'
 import { electronApp, optimizer, is } from '@electron-toolkit/utils'
 import icon from '../../resources/icon.png?asset'
 
 let logWindow: BrowserWindow | null = null
+let resultWindow: BrowserWindow | null = null
 
 const LOG_WINDOW_HTML = `<!DOCTYPE html>
 <html>
@@ -64,7 +74,6 @@ const LOG_WINDOW_HTML = `<!DOCTYPE html>
     const playSoundEl = document.getElementById('playSound');
     let entries = 0;
 
-    // Simple beep sound using Web Audio API
     function playBeep() {
       if (!playSoundEl.checked) return;
       const ctx = new (window.AudioContext || window.webkitAudioContext)();
@@ -112,6 +121,106 @@ const LOG_WINDOW_HTML = `<!DOCTYPE html>
       const d = document.createElement('div');
       d.textContent = s;
       return d.innerHTML;
+    }
+  </script>
+</body>
+</html>`
+
+const RESULT_WINDOW_HTML = `<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<title>Analysis Analysis Results</title>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+    background: #121212; color: #e0e0e0; height: 100vh; display: flex; flex-direction: column; overflow: hidden;
+  }
+  .toolbar {
+    display: flex; justify-content: space-between; align-items: center;
+    padding: 10px 16px; background: #1e1e1e;
+    border-bottom: 2px solid #2c2c2c;
+    flex-shrink: 0;
+  }
+  .toolbar h1 { font-size: 14px; font-weight: 700; color: #4dabf7; text-transform: uppercase; letter-spacing: 1px; }
+  .toolbar-controls { display: flex; align-items: center; gap: 10px; }
+  .btn {
+    padding: 6px 14px; border: none; border-radius: 6px;
+    font-size: 12px; font-weight: 600; cursor: pointer; transition: all 0.2s;
+  }
+  .copy-btn { background: #2f9e44; color: white; }
+  .copy-btn:hover { background: #2b8a3e; }
+  .clear-btn { background: #495057; color: white; }
+  .clear-btn:hover { background: #343a40; }
+  .attach-btn { background: #1971c2; color: white; }
+  .attach-btn:hover { background: #1864ab; }
+  
+  #container { flex: 1; padding: 16px; overflow: auto; position: relative; }
+  #result {
+    font-family: 'SFMono-Regular', Consolas, 'Liberation Mono', Menlo, monospace;
+    font-size: 14px; line-height: 1.6; white-space: pre-wrap; word-wrap: break-word;
+    background: transparent; border: none; outline: none; width: 100%;
+    color: #f8f9fa;
+  }
+  #status { position: fixed; bottom: 10px; right: 20px; font-size: 10px; color: #4dabf7; background: rgba(0,0,0,0.5); padding: 2px 8px; border-radius: 4px; display: none; }
+  ::-webkit-scrollbar { width: 10px; }
+  ::-webkit-scrollbar-track { background: #121212; }
+  ::-webkit-scrollbar-thumb { background: #333; border-radius: 5px; }
+  ::-webkit-scrollbar-thumb:hover { background: #444; }
+</style>
+</head>
+<body>
+  <div class="toolbar">
+    <h1>\u{1F4CA} Analysis Results</h1>
+    <div class="toolbar-controls">
+      <button class="btn copy-btn" onclick="copyText()" id="copyBtn">Copy</button>
+      <button class="btn clear-btn" onclick="clearResult()">Clear</button>
+      <button class="btn attach-btn" onclick="attachBack()">Attach to Main</button>
+    </div>
+  </div>
+  <div id="container">
+    <pre id="result">Waiting for analysis...</pre>
+  </div>
+  <div id="status">Updating...</div>
+  <script>
+    const { ipcRenderer } = require('electron');
+    const resultEl = document.getElementById('result');
+    const statusEl = document.getElementById('status');
+    const containerEl = document.getElementById('container');
+    const copyBtn = document.getElementById('copyBtn');
+
+    ipcRenderer.on('update-result-content', (_, content) => {
+      resultEl.textContent = content;
+      statusEl.style.display = 'block';
+      setTimeout(() => { statusEl.style.display = 'none'; }, 500);
+      containerEl.scrollTop = containerEl.scrollHeight;
+    });
+
+    ipcRenderer.on('clear-result-content', () => {
+      resultEl.textContent = 'Waiting for analysis...';
+    });
+
+    function copyText() {
+      const text = resultEl.textContent;
+      navigator.clipboard.writeText(text).then(() => {
+        const originalText = copyBtn.textContent;
+        copyBtn.textContent = 'Copied!';
+        copyBtn.style.background = '#099268';
+        setTimeout(() => {
+          copyBtn.textContent = originalText;
+          copyBtn.style.background = '#2f9e44';
+        }, 2000);
+      });
+    }
+
+    function clearResult() {
+      ipcRenderer.send('result-window-clear-request');
+      resultEl.textContent = 'Waiting for analysis...';
+    }
+
+    function attachBack() {
+      ipcRenderer.send('result-window-attach-request');
     }
   </script>
 </body>
@@ -336,12 +445,60 @@ app.whenReady().then(() => {
     }
   })
 
-  ipcMain.on('notify-log-clear-from-window', () => {
-    // Forward clear request back to renderer
-    const mainWin = BrowserWindow.getAllWindows().find((w) => w !== logWindow && !w.isDestroyed())
-    if (mainWin) {
-      mainWin.webContents.send('notify-log-cleared')
+  ipcMain.handle('open-result-window', async () => {
+    if (resultWindow && !resultWindow.isDestroyed()) {
+      resultWindow.focus()
+      return true
     }
+    resultWindow = new BrowserWindow({
+      width: 600,
+      height: 700,
+      title: 'Analysis Results',
+      autoHideMenuBar: true,
+      webPreferences: {
+        nodeIntegration: true,
+        contextIsolation: false
+      }
+    })
+    resultWindow.loadURL(`data:text/html;charset=utf-8,${encodeURIComponent(RESULT_WINDOW_HTML)}`)
+    resultWindow.on('closed', () => {
+      resultWindow = null
+      // Notify renderer that the window was closed
+      const mainWin = BrowserWindow.getAllWindows().find((w) => w !== logWindow && !w.isDestroyed())
+      if (mainWin) {
+        mainWin.webContents.send('result-window-closed')
+      }
+    })
+    return true
+  })
+
+  ipcMain.handle('update-result-content', async (_, content: string) => {
+    if (resultWindow && !resultWindow.isDestroyed()) {
+      resultWindow.webContents.send('update-result-content', content)
+    }
+  })
+
+  ipcMain.handle('clear-result-window', async () => {
+    if (resultWindow && !resultWindow.isDestroyed()) {
+      resultWindow.webContents.send('clear-result-content')
+    }
+  })
+
+  ipcMain.on('result-window-clear-request', () => {
+    const mainWin = BrowserWindow.getAllWindows().find(
+      (w) => w !== resultWindow && w !== logWindow && !w.isDestroyed()
+    )
+    if (mainWin) mainWin.webContents.send('clear-result-from-window')
+  })
+
+  ipcMain.on('result-window-attach-request', () => {
+    if (resultWindow && !resultWindow.isDestroyed()) {
+      resultWindow.close()
+    }
+    const mainWin = BrowserWindow.getAllWindows().find(
+      (w) => w !== resultWindow && w !== logWindow && !w.isDestroyed()
+    )
+    if (mainWin) mainWin.webContents.send('result-window-attach-request')
   })
 
   // Set dock icon for macOS in development
