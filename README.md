@@ -22,27 +22,37 @@ GemmaSight is a desktop application that allows you to capture any portion of yo
 
 ### Installation
 
-```bash
-$ npm install
-```
+The recommended way to use GemmaSight is to download the pre-built binaries from the [Releases](https://github.com/blue1st/gemma-sight/releases) page for your operating system.
 
-### Development
+### Building from Source
 
-```bash
-$ npm run dev
-```
+If you prefer to build the application yourself:
 
-### Build
+1. **Clone the repository**:
+   ```bash
+   git clone https://github.com/blue1st/gemma-sight.git
+   cd gemma-sight
+   ```
+2. **Install dependencies**:
+   ```bash
+   npm install
+   ```
+3. **Run in development mode**:
+   ```bash
+   npm run dev
+   ```
+
+### Building Distribution Packages
 
 ```bash
 # For macOS
-$ npm run build:mac
+npm run build:mac
 
 # For Windows
-$ npm run build:win
+npm run build:win
 
 # For Linux
-$ npm run build:linux
+npm run build:linux
 ```
 
 ## Tech Stack

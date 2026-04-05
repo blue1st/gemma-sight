@@ -17,7 +17,7 @@
       <a href="#install">インストール</a>
       <a href="#forms">各項目解説</a>
       <a href="#operation">操作方法</a>
-      <a href="#github" class="btn btn-primary" style="padding: 0.5rem 1.2rem;">GitHub</a>
+      <a href="https://github.com/blue1st/gemma-sight" class="btn btn-primary" style="padding: 0.5rem 1.2rem;" target="_blank">GitHub</a>
     </nav>
   </header>
 
@@ -37,28 +37,29 @@
       <div class="step">
         <div class="step-content">
           <div class="step-number">01</div>
-          <h3>リポジトリのクローン</h3>
-          <p>GitHubからソースコードを取得します。最新の安定版を使用するために、メインブランチをクローンしてください。</p>
-          <pre><code>git clone https://github.com/blue1st/gemma-sight.git
-cd gemma-sight</code></pre>
+          <h3>実行ファイルのダウンロード</h3>
+          <p>GitHubの <strong>Releases</strong> ページから、お使いのOSに合った最新の実行ファイルをダウンロードします。</p>
+          <a href="https://github.com/blue1st/gemma-sight/releases" class="btn btn-primary" target="_blank">Releases ページへ</a>
         </div>
       </div>
 
       <div class="step">
         <div class="step-content">
           <div class="step-number">02</div>
-          <h3>依存関係のインストール</h3>
-          <p>npm を使用して必要なパッケージをインストールします。Electron の依存関係も自動的にセットアップされます。</p>
-          <pre><code>npm install</code></pre>
+          <h3>アプリケーションの起動</h3>
+          <p>ダウンロードしたアーカイブを展開し、アプリケーションを実行します。</p>
+          <ul>
+            <li><strong>macOS (.dmg / .zip)</strong>: フォルダに展開後、アプリケーションを起動してください。</li>
+            <li><strong>Windows (.exe)</strong>: インストーラーまたは実行ファイルを開いてください。</li>
+          </ul>
         </div>
       </div>
 
       <div class="step">
         <div class="step-content">
           <div class="step-number">03</div>
-          <h3>開発モードでの起動</h3>
-          <p>以下のコマンドを実行すると、開発用サーバーが立ち上がり、Electron アプリケーションが起動します。</p>
-          <pre><code>npm run dev</code></pre>
+          <h3>セキュリティ許可 (macOS)</h3>
+          <p>macOSの場合、右クリック（またはControlキーを押しながらクリック）して「開く」を選択し、実行の許可が必要な場合があります。</p>
         </div>
       </div>
     </section>
