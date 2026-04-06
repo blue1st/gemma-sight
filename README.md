@@ -65,3 +65,7 @@ npm run build:linux
 ---
 
 Developed as a sandbox for exploring the capabilities of local LLMs and computer vision.
+
+## License
+
+This project is licensed under the Apache License 2.0. See the [LICENSE](LICENSE) file for details.
