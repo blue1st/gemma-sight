@@ -79,8 +79,8 @@ header {
   font-weight: 500;
   color: #a4b0be;
   transition: 0.3s;
-  /* Adjust for Japanese font baseline differences */
-  padding-top: 4px;
+  /* Visually align Japanese text with Latin logo/button */
+  transform: translateY(2px);
 }
 
 .nav-links a:not(.btn):hover {
