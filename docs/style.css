@@ -57,12 +57,15 @@ header {
 }
 
 .logo {
-  font-size: 1.5rem;
-  font-weight: 800;
+  font-size: 1.6rem;
+  font-weight: 900;
+  letter-spacing: -0.5px;
   background: linear-gradient(135deg, var(--primary-color), var(--secondary-color));
   -webkit-background-clip: text;
   background-clip: text;
   -webkit-text-fill-color: transparent;
+  display: flex;
+  align-items: center;
 }
 
 .nav-links {
@@ -71,9 +74,17 @@ header {
   align-items: center;
 }
 
-.nav-links a:hover {
-  color: var(--primary-color);
+.nav-links a:not(.btn) {
+  font-size: 0.95rem;
+  font-weight: 500;
+  color: #a4b0be;
   transition: 0.3s;
+  /* Adjust for Japanese font baseline differences */
+  padding-top: 4px;
+}
+
+.nav-links a:not(.btn):hover {
+  color: var(--text-color);
 }
 
 /* Hero Section */
