@@ -16,13 +16,14 @@ jobs:
       fail-fast: false
 
     runs-on: ${{ matrix.os }}
-
+    env:
+      FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
     steps:
       - name: Checkout Code
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
 
       - name: Install Node.js
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@v6
         with:
           node-version: 22
           cache: 'npm'
@@ -64,9 +65,11 @@ jobs:
   update-tap:
     needs: publish-release
     runs-on: ubuntu-latest
+    env:
+      FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
     steps:
       - name: Checkout tap repository
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
         with:
           repository: blue1st/homebrew-taps
           token: ${{ secrets.HOMEBREW_TAP_TOKEN }}
