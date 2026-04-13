@@ -20,7 +20,7 @@ win:
         - x64
         - arm64
 nsis:
-  artifactName: ${name}-${version}-setup.${ext}
+  artifactName: ${name}-${version}-${arch}-setup.${ext}
   shortcutName: ${productName}
   uninstallDisplayName: ${productName}
   createDesktopShortcut: always
@@ -60,3 +60,5 @@ appImage:
 npmRebuild: false
 publish:
   provider: github
+  owner: blue1st
+  repo: gemma-sight

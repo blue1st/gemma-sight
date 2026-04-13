@@ -13,6 +13,7 @@ jobs:
     strategy:
       matrix:
         os: [macos-latest, windows-latest]
+      fail-fast: false
 
     runs-on: ${{ matrix.os }}
 
@@ -43,8 +44,21 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
-  update-tap:
+  publish-release:
     needs: release
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - name: Publish Release
+        run: |
+          VERSION=${GITHUB_REF#refs/tags/v}
+          gh release edit "v$VERSION" --draft=false
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+  update-tap:
+    needs: publish-release
     runs-on: ubuntu-latest
     steps:
       - name: Checkout tap repository
