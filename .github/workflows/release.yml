@@ -33,16 +33,20 @@ jobs:
       - name: Build & Publish
         run: |
           if [ "$RUNNER_OS" == "macOS" ]; then
-            npm run build:mac -- --publish always
+            npm run build
+            npx electron-builder --mac --publish always
           elif [ "$RUNNER_OS" == "Windows" ]; then
-            npm run build:win -- --publish always
+            npm run build
+            npx electron-builder --win --publish always
           else
-            echo "Building for Linux (not specified in request)"
-            npm run build:linux -- --publish always
+            echo "Building for Linux"
+            npm run build
+            npx electron-builder --linux --publish always
           fi
         shell: bash
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
   publish-release:
     needs: release
