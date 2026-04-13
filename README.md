@@ -22,7 +22,18 @@ GemmaSight is a desktop application that allows you to capture any portion of yo
 
 ### Installation
 
-The recommended way to use GemmaSight is to download the pre-built binaries from the [Releases](https://github.com/blue1st/gemma-sight/releases) page for your operating system.
+#### Homebrew (macOS)
+
+You can install GemmaSight using Homebrew Cask:
+
+```bash
+brew tap blue1st/taps
+brew install --cask gemmasight
+```
+
+#### Manual Download
+
+Download the pre-built binaries from the [Releases](https://github.com/blue1st/gemma-sight/releases) page for your operating system.
 
 ### Building from Source
 
