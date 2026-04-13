@@ -62,3 +62,4 @@ publish:
   provider: github
   owner: blue1st
   repo: gemma-sight
+  releaseType: release
