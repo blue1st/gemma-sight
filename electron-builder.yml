@@ -46,7 +46,7 @@ mac:
   notarize: false
 dmg:
   icon: build/icon.icns
-  artifactName: ${name}-${version}.${ext}
+  artifactName: ${name}-${version}-${arch}.${ext}
 linux:
   icon: build/icon.png
   target:

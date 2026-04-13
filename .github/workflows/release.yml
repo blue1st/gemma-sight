@@ -42,3 +42,61 @@ jobs:
         shell: bash
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+  update-tap:
+    needs: release
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout tap repository
+        uses: actions/checkout@v4
+        with:
+          repository: blue1st/homebrew-taps
+          token: ${{ secrets.HOMEBREW_TAP_TOKEN }}
+          path: homebrew-taps
+
+      - name: Update Cask
+        run: |
+          VERSION=${GITHUB_REF#refs/tags/v}
+          
+          # Download artifacts to calculate SHA256
+          curl -L -o gemmasight-arm64.dmg "https://github.com/${{ github.repository }}/releases/download/v${VERSION}/gemmasight-${VERSION}-arm64.dmg"
+          curl -L -o gemmasight-x64.dmg "https://github.com/${{ github.repository }}/releases/download/v${VERSION}/gemmasight-${VERSION}-x64.dmg"
+          
+          SHA256_ARM=$(sha256sum gemmasight-arm64.dmg | awk '{print $1}')
+          SHA256_X64=$(sha256sum gemmasight-x64.dmg | awk '{print $1}')
+          
+          CASK_FILE="homebrew-taps/Casks/gemmasight.rb"
+          mkdir -p homebrew-taps/Casks
+          
+          cat <<EOF > $CASK_FILE
+          cask "gemmasight" do
+            arch arm: "arm64", intel: "x64"
+
+            version "$VERSION"
+            sha256 arm:   "$SHA256_ARM",
+                   intel: "$SHA256_X64"
+
+            url "https://github.com/${{ github.repository }}/releases/download/v#{version}/gemmasight-#{version}-#{arch}.dmg"
+            name "GemmaSight"
+            desc "Real-time AI screen description app powered by Gemma 4"
+            homepage "https://github.com/${{ github.repository }}"
+
+            app "GemmaSight.app"
+
+            zap trash: [
+              "~/Library/Application Support/gemmasight",
+              "~/Library/Logs/gemmasight",
+              "~/Library/Preferences/com.gemmasight.app.plist",
+              "~/Library/Saved Application State/com.gemmasight.app.savedState",
+            ]
+          end
+          EOF
+
+      - name: Commit and Push
+        run: |
+          cd homebrew-taps
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add Casks/gemmasight.rb
+          git commit -m "Update gemmasight to ${GITHUB_REF#refs/tags/v}" || exit 0
+          git push
