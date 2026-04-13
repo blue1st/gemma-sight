@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.5.1](https://github.com/blue1st/gemma-sight/compare/v1.5.0...v1.5.1) (2026-04-13)
+
+
+### Bug Fixes
+
+* specify repository in release publish command to ensure correct target ([cfc7a59](https://github.com/blue1st/gemma-sight/commit/cfc7a59464f1de3b4a83c03b47269f5404530b63))
+
 # [1.5.0](https://github.com/blue1st/gemma-sight/compare/v1.4.5...v1.5.0) (2026-04-13)
 
 
