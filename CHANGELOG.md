@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.5.5](https://github.com/blue1st/gemma-sight/compare/v0.0.1...v1.5.5) (2026-09-22)
+
+
+### Bug Fixes
+
+* **homebrew:** use postflight_steps instead of deprecated postflight ([74dadc4](https://github.com/blue1st/gemma-sight/commit/74dadc4c78c6ab7c4ef2fcc0eb512868d0912f14))
+
 ## [1.5.4](https://github.com/blue1st/gemma-sight/compare/v1.5.3...v1.5.4) (2026-04-13)
 
 ## [1.5.3](https://github.com/blue1st/gemma-sight/compare/v1.5.2...v1.5.3) (2026-04-13)
