@@ -67,11 +67,20 @@ jobs:
     needs: publish-release
     runs-on: ubuntu-latest
     steps:
+      - name: Generate GitHub App Token
+        id: app-token
+        uses: actions/create-github-app-token@v1
+        with:
+          app-id: ${{ vars.TAP_APP_ID }}
+          private-key: ${{ secrets.TAP_APP_PRIVATE_KEY }}
+          owner: blue1st
+          repositories: homebrew-taps
+
       - name: Checkout tap repository
         uses: actions/checkout@v6
         with:
           repository: blue1st/homebrew-taps
-          token: ${{ secrets.HOMEBREW_TAP_TOKEN }}
+          token: ${{ steps.app-token.outputs.token }}
           path: homebrew-taps
 
       - name: Update Cask
