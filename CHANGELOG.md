@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.5.6](https://github.com/blue1st/gemma-sight/compare/v1.5.5...v1.5.6) (2026-10-08)
+
+
+### Bug Fixes
+
+* **homebrew:** extract update-homebrew.sh and use caveats instead of postflight_steps ([f267b4a](https://github.com/blue1st/gemma-sight/commit/f267b4aaddc67b6bebe1c81b0f459afa956515b8))
+
 ## [1.5.5](https://github.com/blue1st/gemma-sight/compare/v0.0.1...v1.5.5) (2026-09-22)
 
 
