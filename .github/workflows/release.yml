@@ -67,6 +67,22 @@ jobs:
     needs: publish-release
     runs-on: ubuntu-latest
     steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: lts/*
+
+      - name: Download artifacts from release
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          VERSION=${GITHUB_REF#refs/tags/v}
+          gh release download "v$VERSION" --repo ${{ github.repository }} --pattern "*.dmg" --dir .
+          ls -R
+
       - name: Generate GitHub App Token
         id: app-token
         uses: actions/create-github-app-token@v1
@@ -76,60 +92,9 @@ jobs:
           owner: blue1st
           repositories: homebrew-taps
 
-      - name: Checkout tap repository
-        uses: actions/checkout@v6
-        with:
-          repository: blue1st/homebrew-taps
-          token: ${{ steps.app-token.outputs.token }}
-          path: homebrew-taps
-
-      - name: Update Cask
+      - name: Update Homebrew Tap
+        env:
+          HOMEBREW_TAP_TOKEN: ${{ steps.app-token.outputs.token }}
         run: |
-          VERSION=${GITHUB_REF#refs/tags/v}
-          
-          # Download artifacts to calculate SHA256
-          curl -L -o gemmasight-arm64.dmg "https://github.com/${{ github.repository }}/releases/download/v${VERSION}/gemmasight-${VERSION}-arm64.dmg"
-          curl -L -o gemmasight-x64.dmg "https://github.com/${{ github.repository }}/releases/download/v${VERSION}/gemmasight-${VERSION}-x64.dmg"
-          
-          SHA256_ARM=$(sha256sum gemmasight-arm64.dmg | awk '{print $1}')
-          SHA256_X64=$(sha256sum gemmasight-x64.dmg | awk '{print $1}')
-          
-          CASK_FILE="homebrew-taps/Casks/gemmasight.rb"
-          mkdir -p homebrew-taps/Casks
-          
-          cat <<EOF > $CASK_FILE
-          cask "gemmasight" do
-            arch arm: "arm64", intel: "x64"
-
-            version "$VERSION"
-            sha256 arm:   "$SHA256_ARM",
-                   intel: "$SHA256_X64"
-
-            url "https://github.com/${{ github.repository }}/releases/download/v#{version}/gemmasight-#{version}-#{arch}.dmg"
-            name "GemmaSight"
-            desc "Real-time AI screen description app powered by Gemma 4"
-            homepage "https://github.com/${{ github.repository }}"
-
-            app "GemmaSight.app"
-            
-            postflight_steps do
-              run "/usr/bin/xattr", args: ["-cr", "#{appdir}/GemmaSight.app"]
-            end
-
-            zap trash: [
-              "~/Library/Application Support/gemmasight",
-              "~/Library/Logs/gemmasight",
-              "~/Library/Preferences/com.gemmasight.app.plist",
-              "~/Library/Saved Application State/com.gemmasight.app.savedState",
-            ]
-          end
-          EOF
-
-      - name: Commit and Push
-        run: |
-          cd homebrew-taps
-          git config user.name "github-actions[bot]"
-          git config user.email "github-actions[bot]@users.noreply.github.com"
-          git add Casks/gemmasight.rb
-          git commit -m "Update gemmasight to ${GITHUB_REF#refs/tags/v}" || exit 0
-          git push
+          chmod +x ./scripts/update-homebrew.sh
+          ./scripts/update-homebrew.sh
